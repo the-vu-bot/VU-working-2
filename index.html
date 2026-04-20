@@ -476,6 +476,25 @@
         </div>
     </div>
 
+    <div id="proforma-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; z-index: 10001;">
+        <div class="settings-card" style="max-width: 600px; width: 95%;">
+            <div class="settings-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div>🧹 Vault Maintenance <span id="orphan-count-badge" style="font-size:0.8rem; background:var(--cbt-red); color:white; padding:2px 8px; border-radius:12px; margin-left:10px;">0 Orphans</span></div>
+                    <span style="cursor:pointer; color:#888;" onclick="closeProformaModal()">✖</span>
+                </div>
+            </div>
+            <div class="settings-body" style="padding: 20px; max-height: 60vh; overflow-y: auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                    <div style="font-size:0.85rem; color:#666;">Images found in GitHub with no matching question in your Master Bank.</div>
+                    <button class="btn btn-outline" style="border-color:var(--cbt-blue); color:var(--cbt-blue); padding:4px 10px; font-size:0.85rem;" onclick="copyAllOrphans(this)">📋 Copy All UIDs</button>
+                </div>
+                <div id="proforma-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
+                    </div>
+            </div>
+        </div>
+    </div>
+
     <div id="home-screen" style="display: none;">
         <div class="home-card">
             <div class="home-header-row">
@@ -517,9 +536,10 @@
                         <div class="mode-title">☁️ Auto-Merge Cloud Sync</div>
                         <div class="mode-desc" style="margin-bottom:0;">Securely merges device data with GitHub Vault.</div>
                     </div>
-                    <div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end;">
                         <button id="cloud-push-btn" class="btn btn-outline" style="border-color: #d9a05b; color: #b87a29;" onclick="pushToCloud()">↑ Push / Sync</button>
                         <button id="cloud-pull-btn" class="btn btn-outline" style="border-color: #5b9bd9; color: #297ab8;" onclick="pullFromCloud()">↓ Pull / Restore</button>
+                        <button class="btn btn-outline" style="border-color: var(--cbt-red); color: var(--cbt-red);" onclick="scanForOrphans()">🧹 Maintenance</button>
                     </div>
                 </div>
 
@@ -2283,6 +2303,11 @@
             if (summaryOverlay && summaryOverlay.style.display === 'flex' && event.target === summaryOverlay) {
                 closeSummaryModal();
             }
+            // Proforma Overlay Click-Outside
+            let proformaOverlay = document.getElementById('proforma-overlay');
+            if (proformaOverlay && proformaOverlay.style.display === 'flex' && event.target === proformaOverlay) {
+                closeProformaModal();
+            }
         });
 
         // --- PHASE 3: THE VU JOURNEY UI & FETCH LOGIC ---
@@ -2740,6 +2765,97 @@
             }
             // Manage gear visibility based on the screen we navigated back to
             document.querySelector('.floating-gear').style.display = (mode === 'test' || mode === 'practice') ? 'none' : 'flex';
+        }
+
+        // --- PHASE 2: REPOSITORY CLEANUP & PROFORMA LOGIC ---
+        let orphanedUIDs = [];
+
+        async function scanForOrphans() {
+            let token = localStorage.getItem(STORAGE_GITHUB_TOKEN);
+            if (!token) {
+                token = prompt("Enter your GitHub PAT for Maintenance:");
+                if (!token) return;
+                localStorage.setItem(STORAGE_GITHUB_TOKEN, token);
+            }
+
+            document.getElementById('proforma-grid').innerHTML = '<div style="grid-column: 1 / -1; text-align:center; color:#888; padding: 20px;">Scanning GitHub Repository... ⏳</div>';
+            document.getElementById('orphan-count-badge').innerText = 'Scanning...';
+            document.getElementById('proforma-overlay').style.display = 'flex';
+
+            try {
+                // 1. Gather all active UIDs from Main and Calc banks
+                let activeUIDs = new Set(masterBank.map(q => q.uid));
+                const currentKey = localStorage.getItem('vu_unlocked_key');
+                if (currentKey) {
+                    try {
+                        const response = await fetch(currentKey + '_calc.json?t=' + new Date().getTime());
+                        if (response.ok) {
+                            let calcBank = await response.json();
+                            calcBank.forEach(q => activeUIDs.add(q.uid));
+                        }
+                    } catch (e) {}
+                }
+
+                // 2. Fetch files from GitHub 'solutions' folder
+                const apiUrl = 'https://api.github.com/repos/the-vu-bot/exam-engine-vu/contents/solutions';
+                const response = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+                
+                orphanedUIDs = [];
+                if (response.ok) {
+                    const files = await response.json();
+                    files.forEach(file => {
+                        if (file.name.endsWith('.jpg') || file.name.endsWith('.png')) {
+                            let fileUid = file.name.substring(0, file.name.lastIndexOf('.'));
+                            // Ignore VU-logo and check if the UID is missing from our active sets
+                            if (fileUid !== 'VU-logo' && !activeUIDs.has(fileUid)) {
+                                orphanedUIDs.push(fileUid);
+                            }
+                        }
+                    });
+                } else if (response.status !== 404) {
+                    throw new Error("GitHub API Error");
+                }
+
+                // 3. Render the Proforma Grid
+                document.getElementById('orphan-count-badge').innerText = `${orphanedUIDs.length} Orphans`;
+                let gridHtml = '';
+                
+                if (orphanedUIDs.length === 0) {
+                    gridHtml = '<div style="grid-column: 1 / -1; text-align:center; color:var(--cbt-green); padding: 20px; font-weight:bold;">✅ Repository is perfectly clean! No orphans found.</div>';
+                } else {
+                    orphanedUIDs.forEach(uid => {
+                        gridHtml += `
+                        <div style="background:#fdfdfd; border:1px solid #eee; border-radius:6px; padding:8px 12px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-family:monospace; font-size:0.85rem; color:#333; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:130px;" title="${uid}">${uid}</span>
+                            <button class="btn btn-outline" style="padding:2px 6px; font-size:0.75rem;" onclick="copySingleOrphan('${uid}', this)">📋</button>
+                        </div>`;
+                    });
+                }
+                document.getElementById('proforma-grid').innerHTML = gridHtml;
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('proforma-grid').innerHTML = '<div style="grid-column: 1 / -1; text-align:center; color:var(--cbt-red); padding: 20px;">Failed to scan repository. Check PAT permissions.</div>';
+                document.getElementById('orphan-count-badge').innerText = 'Error';
+            }
+        }
+
+        function closeProformaModal() { document.getElementById('proforma-overlay').style.display = 'none'; }
+
+        function copySingleOrphan(uid, btnEl) {
+            navigator.clipboard.writeText(uid).then(() => {
+                let orig = btnEl.innerHTML; btnEl.innerHTML = '✅';
+                setTimeout(() => btnEl.innerHTML = orig, 1500);
+            });
+        }
+
+        function copyAllOrphans(btnEl) {
+            if (orphanedUIDs.length === 0) return;
+            let textToCopy = orphanedUIDs.join('\n');
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                let orig = btnEl.innerHTML; btnEl.innerHTML = '✅ Copied All';
+                setTimeout(() => btnEl.innerHTML = orig, 2000);
+            });
         }
 
         window.onload = () => { 
