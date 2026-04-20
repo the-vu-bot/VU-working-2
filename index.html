@@ -358,6 +358,13 @@
             <button class="btn btn-blue" style="width:100%; font-size:1.1rem; padding: 12px;" onclick="resumeTest()">Resume Test</button>
         </div>
     </div>
+    <div id="session-break-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10000;">
+        <div class="pause-card" style="border-top-color: var(--cbt-purple);">
+            <h2 id="session-break-title" style="margin-top:0; color:var(--text);">Session Completed 🛑</h2>
+            <p id="session-break-msg" style="color:#666; margin-bottom:25px;">Please wait before starting the next session.</p>
+            <button class="btn btn-blue" style="width:100%; font-size:1.1rem; padding: 12px; background: var(--cbt-purple);" onclick="resumeFromBreak()">Start Next Session</button>
+        </div>
+    </div>
 
     <button class="floating-gear" onclick="openSettings()" title="Engine Settings">⚙️</button>
 
@@ -1491,6 +1498,20 @@
 
         function pauseTest() { isPaused = true; clearInterval(timerId); document.getElementById('pause-overlay').style.display = 'flex'; saveTestState(); }
         function resumeTest() { isPaused = false; document.getElementById('pause-overlay').style.display = 'none'; startTestTimer(); }
+        function triggerSessionBreak(title, msg) {
+            isPaused = true;
+            clearInterval(timerId);
+            document.getElementById('session-break-title').innerText = title;
+            document.getElementById('session-break-msg').innerText = msg;
+            document.getElementById('session-break-overlay').style.display = 'flex';
+            saveTestState();
+        }
+
+        function resumeFromBreak() {
+            document.getElementById('session-break-overlay').style.display = 'none';
+            isPaused = false;
+            startTestTimer();
+        }
 
         function startTestTimer() {
             clearInterval(timerId);
@@ -1505,10 +1526,22 @@
                     document.getElementById('sec-timer').innerText = formatTime(sectionalSeconds);
                     
                     if (sectionalSeconds <= 0) {
+                        let finishedSectionName = mockBoundaries[activeSectionIndex].name;
+                        
                         activeSectionIndex++;
                         if (activeSectionIndex < mockBoundaries.length) {
                             sectionalSeconds = mockBoundaries[activeSectionIndex].allocatedTime; 
                             loadQuestion(mockBoundaries[activeSectionIndex].start); buildPalette();
+                            
+                            // Check for SSC Tier-II Session Breaks
+                            if (userMockPreset === 'ssc-tier2') {
+                                if (finishedSectionName === 'Reasoning') {
+                                    triggerSessionBreak("Session-I Completed 🛑", "Maths & Reasoning finished. Take a breath, then start Session-II (English & GS).");
+                                } else if (finishedSectionName === 'GS') {
+                                    triggerSessionBreak("Session-II Completed 🛑", "English & GS finished. Click below to start Section-III (Computer Knowledge).");
+                                }
+                            }
+                            
                         } else { submitExam(); }
                     }
                 } else if (examType === 'sprint' && currentMode === 'test') {
