@@ -2518,7 +2518,21 @@
 
             let finalScore = (correct - (wrongTotal / 3)).toFixed(2);
             let acc = attempted > 0 ? Math.round((correct/attempted)*100) : 0;
-            let examLabel = examType === 'mock' ? 'Full Mock' : `Sprint: ${questions[0]?.subject || 'Mixed'}`;
+            
+            // --- FIXED EXAM LABEL LOGIC ---
+            let examLabel = "";
+            const subName = questions[0]?.subject || 'Mixed';
+            
+            if (isCalcDrill) {
+                examLabel = "Calculation Drill";
+            } else if (examType === 'mock') {
+                examLabel = "Full Mock";
+            } else if (examType === 'practice') {
+                examLabel = `Practice: ${subName}`;
+            } else {
+                examLabel = `Sprint: ${subName}`;
+            }
+            // ------------------------------
 
             let payloadObj = {
                 uids: questions.map(q => q.uid),
