@@ -1269,6 +1269,8 @@
 
                     loadQuestion(currentQ); pauseTest(); 
                 }
+                // Hide gear if we refreshed into a live test
+                document.querySelector('.floating-gear').style.display = (currentMode === 'test' || currentMode === 'practice') ? 'none' : 'flex';
                 return true;
             }
             return false;
@@ -1410,6 +1412,7 @@
             state = questions.map(() => ({ selected: null, status: 'unvisited', timeTaken: 0 }));
             document.getElementById('home-screen').style.display = 'none';
             document.getElementById('cbt-screen').style.display = 'flex';
+            document.querySelector('.floating-gear').style.display = 'none'; // Hide gear in test
             buildPalette(); loadQuestion(0); startTestTimer(); saveTestState();
         }
 
@@ -1537,8 +1540,17 @@
                 const canEdit = isEnglishSubject || (currentLang === defaultLang);
                 if(currentMode === 'review' || !canEdit) { radio.disabled = true; }
 
-                row.onclick = () => {
+                row.onclick = (e) => {
                     if(currentMode === 'review' || !canEdit) return;
+                    
+                    // --- PC VS MOBILE SELECTION LOGIC ---
+                    if (window.innerWidth > 768) {
+                        // On PC, only allow clicks exactly on the radio input or its square container
+                        if (e.target.tagName !== 'INPUT' && !e.target.closest('.radio-square')) {
+                            return; 
+                        }
+                    }
+
                     if(state[currentQ].selected === i) {
                         state[currentQ].selected = null; state[currentQ].status = 'not-answered';
                     } else {
@@ -1820,6 +1832,9 @@
             localStorage.setItem(STORAGE_WRONG, JSON.stringify(wrongMap));
             localStorage.setItem(STORAGE_TIME, JSON.stringify(timeMap));
 
+            renderAnalyticsDisplay(); showDashboard(); saveTestState(); 
+            
+            document.querySelector('.floating-gear').style.display = 'flex'; // Show gear after test
             renderAnalyticsDisplay(); showDashboard(); saveTestState(); 
             
             // NEW: Save to Google Sheets
@@ -2620,6 +2635,8 @@
                 document.getElementById('mobile-submit-btn').classList.remove('hide-for-review');
                 // -------------------------------------------------------
             }
+            // Manage gear visibility based on the screen we navigated back to
+            document.querySelector('.floating-gear').style.display = (mode === 'test' || mode === 'practice') ? 'none' : 'flex';
         }
 
         window.onload = () => { 
