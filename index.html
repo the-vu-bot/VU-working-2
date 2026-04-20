@@ -709,6 +709,7 @@
         let journeyFilterType = 'all';
         let journeyFilterSubject = 'all';
         let activeChartTab = 'score';
+        let activeMockSubject = 'Overall';
         // ----------------------------------
         let masterBank = [];
         let questions = [];
@@ -2267,24 +2268,38 @@
             renderJourneyDashboard();
         }
 
+        function switchMockSubject(sub) {
+            activeMockSubject = sub;
+            renderJourneyDashboard();
+        }
+
         function createSingleSVG(chartData, key, title, color) {
+            // Smart extraction: Checks if the data exists, and converts time properly
             let extractVal = (d) => {
-                if(key === 'TimeSpent') return parseFloat((d.TimeSpent / 60).toFixed(1)); // Convert seconds to Minutes
-                return parseFloat(d[key]) || 0;
+                if(d[key] === undefined || d[key] === null || d[key] === '') return null; 
+                if(key.includes('Time')) return parseFloat((d[key] / 60).toFixed(1)); 
+                return parseFloat(d[key]);
             };
 
-            let maxVal = Math.max(...chartData.map(d => extractVal(d)), 10);
-            let minVal = Math.min(...chartData.map(d => extractVal(d)), 0);
-            let width = 300; let height = 120; let padding = 20;
-            let pX = (width - padding*2) / Math.max(chartData.length - 1, 1);
+            // Filter out tests that didn't include this specific subject to prevent chart crashes
+            let validData = chartData.filter(d => extractVal(d) !== null);
+            
+            if(validData.length < 2) {
+                return `<div style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; border: 1px solid #eee; display: flex; align-items: center; justify-content: center; text-align:center; color:#888;">Not enough data for<br>${title}</div>`;
+            }
 
-            let points = chartData.map((d, i) => {
+            let maxVal = Math.max(...validData.map(d => extractVal(d)), 10);
+            let minVal = Math.min(...validData.map(d => extractVal(d)), 0);
+            let width = 300; let height = 120; let padding = 20;
+            let pX = (width - padding*2) / Math.max(validData.length - 1, 1);
+
+            let points = validData.map((d, i) => {
                 let val = extractVal(d);
                 let y = height - padding - ((val - minVal) / (maxVal - minVal || 1)) * (height - padding*2);
                 return `${padding + (i * pX)},${y}`;
             }).join(' ');
 
-            let circles = chartData.map((d, i) => {
+            let circles = validData.map((d, i) => {
                 let x = padding + (i * pX); let val = extractVal(d);
                 let y = height - padding - ((val - minVal) / (maxVal - minVal || 1)) * (height - padding*2);
                 return `<circle cx="${x}" cy="${y}" r="4" fill="${color}" stroke="white" stroke-width="1.5"/>
@@ -2303,12 +2318,35 @@
         }
 
         function generateAdvancedCharts(data) {
-            if(data.length < 2) return ''; 
             let chartData = [...data].slice(0, 15).reverse(); 
-            let isMobile = window.innerWidth <= 768; // Checks if device is mobile width
-            
+            let isMobile = window.innerWidth <= 768; 
             let html = '<div style="margin-bottom: 20px;">';
 
+            // --- THE DEEP DIVE MOCK TOGGLES ---
+            if (journeyFilterType === 'mock') {
+                // Auto-detect which subjects exist in your Google Sheet data
+                let availableSubjects = new Set();
+                data.forEach(d => {
+                    Object.keys(d).forEach(key => {
+                        if (key.endsWith('_Score')) availableSubjects.add(key.replace('_Score', ''));
+                    });
+                });
+
+                if (availableSubjects.size > 0) {
+                    html += `<div style="display:flex; justify-content:center; gap:8px; margin-bottom:15px; flex-wrap:wrap; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <strong style="width: 100%; text-align: center; color: var(--cbt-purple); font-size: 0.85rem; margin-bottom: 5px;">Subject Deep-Dive</strong>
+                        <button class="filter-chip ${activeMockSubject==='Overall'?'active':''}" onclick="switchMockSubject('Overall')">Overall</button>`;
+                    
+                    availableSubjects.forEach(sub => {
+                        html += `<button class="filter-chip ${activeMockSubject===sub?'active':''}" onclick="switchMockSubject('${sub}')">${sub}</button>`;
+                    });
+                    html += `</div>`;
+                }
+            } else {
+                activeMockSubject = 'Overall'; // Reset if not looking at Full Mocks
+            }
+
+            // --- MOBILE METRIC TABS ---
             if (isMobile) {
                 html += `
                 <div style="display:flex; justify-content:center; gap:8px; margin-bottom:15px; flex-wrap:wrap;">
@@ -2320,9 +2358,16 @@
 
             html += `<div style="display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px;">`;
 
-            if (!isMobile || activeChartTab === 'score') html += createSingleSVG(chartData, 'Score', '🏆 Score Trend', 'var(--cbt-blue)');
-            if (!isMobile || activeChartTab === 'acc') html += createSingleSVG(chartData, 'Accuracy', '🎯 Accuracy Trend (%)', 'var(--cbt-green)');
-            if (!isMobile || activeChartTab === 'time') html += createSingleSVG(chartData, 'TimeSpent', '⏱️ Time Spent (Mins)', '#d9a05b');
+            // Dynamically build the Keys based on the active Deep-Dive Subject
+            let scoreKey = activeMockSubject === 'Overall' ? 'Score' : `${activeMockSubject}_Score`;
+            let accKey = activeMockSubject === 'Overall' ? 'Accuracy' : `${activeMockSubject}_Acc`;
+            let timeKey = activeMockSubject === 'Overall' ? 'TimeSpent' : `${activeMockSubject}_Time`;
+            let titleSuffix = activeMockSubject === 'Overall' ? '' : ` (${activeMockSubject})`;
+
+            // Draw the Charts
+            if (!isMobile || activeChartTab === 'score') html += createSingleSVG(chartData, scoreKey, '🏆 Score' + titleSuffix, 'var(--cbt-blue)');
+            if (!isMobile || activeChartTab === 'acc') html += createSingleSVG(chartData, accKey, '🎯 Accuracy (%)' + titleSuffix, 'var(--cbt-green)');
+            if (!isMobile || activeChartTab === 'time') html += createSingleSVG(chartData, timeKey, '⏱️ Time (Mins)' + titleSuffix, '#d9a05b');
 
             html += `</div></div>`;
             return html;
