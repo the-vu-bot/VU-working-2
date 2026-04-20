@@ -518,9 +518,12 @@
     </div>
 
     <div id="journey-screen" style="display: none; flex-direction: column; height: 100%; background: var(--bg); overflow: hidden;">
-        <div class="header" style="background: white; padding: 10px 20px; border-bottom: 2px solid var(--border); flex-shrink: 0; position: sticky; top: 0; z-index: 100;">
-            <div class="header-left" style="flex: unset;">
+        <div class="header" style="background: white; padding: 10px 20px; border-bottom: 2px solid var(--border); flex-shrink: 0; position: sticky; top: 0; z-index: 100; display: flex; align-items: center;">
+            <div class="header-left" style="flex: 1; min-width: 0; justify-content: flex-start;">
                 <div class="home-icon" onclick="exitJourneyPage()">🏠</div>
+            </div>
+            <div style="font-size: 1.2rem; font-weight: bold; text-align: center; white-space: nowrap;">The VU Journey</div>
+            <div style="flex: 1; min-width: 0;"></div> </div>
             </div>
             <div style="font-size: 1.2rem; font-weight: bold; flex: 1; text-align: center;">The VU Journey</div>
             <div style="width: 32px;"></div> </div>
@@ -572,13 +575,13 @@
         <div id="slider-content" style="padding: 20px; overflow-y: auto; flex: 1;"></div>
     </div>
 
-    <div id="analysis-screen">
-        <div class="header" style="background: white; padding: 10px 20px; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 100;">
-            <div class="header-left" style="flex: unset;">
+    <div id="analysis-screen" style="display: none; flex-direction: column; height: 100%; background: var(--bg);">
+        <div class="header" style="background: white; padding: 10px 20px; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 100; display: flex; align-items: center;">
+            <div class="header-left" style="flex: 1; min-width: 0; justify-content: flex-start;">
                 <div class="home-icon" onclick="goHomeAlert()">🏠</div>
             </div>
-            <div style="font-size: 1.2rem; font-weight: bold; flex: 1; text-align: center;">VU || Analytics</div>
-            <div>
+            <div style="font-size: 1.2rem; font-weight: bold; text-align: center; white-space: nowrap;">VU || Analytics</div>
+            <div style="flex: 1; display: flex; justify-content: flex-end; min-width: 0;">
                 <button class="btn btn-blue" style="padding: 6px 12px; font-size: 0.9rem; margin: 0;" onclick="startReviewMode()">👁 Solutions</button>
             </div>
         </div>
@@ -2255,7 +2258,7 @@
             // 1. Render Main Filters
             let html = renderSlicer();
             
-            // 2. Render Deep Dive Panel (Moved here!)
+            // 2. Render Deep Dive Panel
             html += renderDeepDiveSlicer();
 
             if (!data || data.length === 0) {
@@ -2270,14 +2273,31 @@
             // 4. Render the Charts
             html += generateAdvancedCharts(data);
 
-            // 5. Render the Test Cards
+            // 5. Render the Test Cards with Advanced Postmortem Stats
             data.forEach((test) => {
                 let absoluteIndex = cachedJourneyData.indexOf(test); 
                 let dateObj = new Date(test.Timestamp);
                 let dateStr = dateObj.toLocaleDateString('en-IN') + " • " + dateObj.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
                 
+                // Unzip Payload to calculate Deep Stats instantly
+                let payload = { state: [], uids: [] };
+                let correct = 0, wrong = 0, attempted = 0;
+                try {
+                    payload = JSON.parse(test.Payload);
+                    payload.state.forEach((s, i) => {
+                        if(s.selected !== null) {
+                            attempted++;
+                            // Cross-reference with Master Bank to verify Correct/Wrong
+                            let q = masterBank.find(mq => mq.uid === payload.uids[i]);
+                            if(q && s.selected === q.correct) correct++;
+                            else wrong++;
+                        }
+                    });
+                } catch(e) {}
+                let totalQs = payload.uids ? payload.uids.length : 0;
+
                 html += `
-                <div class="rev-card" style="display: flex; flex-direction: column; gap: 10px; border-left: 5px solid var(--cbt-blue);">
+                <div class="rev-card" style="display: flex; flex-direction: column; gap: 12px; border-left: 5px solid var(--cbt-blue);">
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #eee; padding-bottom: 8px;">
                         <strong style="color: #333; font-size: 1.1rem;">${test.ExamType}</strong>
                         <div style="display: flex; gap: 10px; align-items: center;">
@@ -2285,13 +2305,18 @@
                             <button onclick="deleteJourneyRecord('${test.Timestamp}', this)" style="background: none; border: none; cursor: pointer; font-size: 1.1rem; opacity: 0.6; padding: 0; transition: 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" title="Delete Test">🗑️</button>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; gap: 15px; text-align: center;">
-                            <div class="metric">Score<span>${test.Score}</span></div>
-                            <div class="metric" style="color:var(--cbt-green);">Acc<span>${test.Accuracy}%</span></div>
-                            <div class="metric">Time<span>${formatTime(test.TimeSpent)}</span></div>
-                        </div>
-                        <button class="btn btn-blue" style="padding: 6px 16px;" onclick="rehydrateTest(${absoluteIndex})">👁️ View</button>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); gap: 8px; background: #fdfdfd; padding: 12px; border-radius: 8px; border: 1px solid #eaeaea; text-align: center;">
+                        <div style="font-size: 0.75rem; color: #666; font-weight: bold;">Score<div style="font-size: 1.15rem; font-weight: 900; color: var(--cbt-blue); margin-top: 4px;">${test.Score}</div></div>
+                        <div style="font-size: 0.75rem; color: #666; font-weight: bold;">Right<div style="font-size: 1.15rem; font-weight: 900; color: var(--cbt-green); margin-top: 4px;">${correct}</div></div>
+                        <div style="font-size: 0.75rem; color: #666; font-weight: bold;">Wrong<div style="font-size: 1.15rem; font-weight: 900; color: var(--cbt-red); margin-top: 4px;">${wrong}</div></div>
+                        <div style="font-size: 0.75rem; color: #666; font-weight: bold;">Acc<div style="font-size: 1.15rem; font-weight: 900; color: var(--text); margin-top: 4px;">${test.Accuracy}%</div></div>
+                        <div style="font-size: 0.75rem; color: #666; font-weight: bold;">Att<div style="font-size: 1.15rem; font-weight: 900; color: var(--text); margin-top: 4px;">${attempted}/${totalQs}</div></div>
+                        <div style="font-size: 0.75rem; color: #666; font-weight: bold;">Time<div style="font-size: 1.15rem; font-weight: 900; color: var(--text); margin-top: 4px;">${formatTime(test.TimeSpent)}</div></div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end;">
+                        <button class="btn btn-blue" style="padding: 6px 20px;" onclick="rehydrateTest(${absoluteIndex})">👁️ View Full Report</button>
                     </div>
                     <textarea id="payload-data-${absoluteIndex}" style="display:none;">${test.Payload}</textarea>
                 </div>`;
