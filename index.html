@@ -892,15 +892,15 @@
         
         // --- PHASE 2 & 3: EXPANDED MODAL FUNCTIONS ---
         function openSettings() {
+            renderPresetChips();
+            applyMockPreset(activePresetId);
             document.getElementById('set-sprint-time').value = userSprintTime;
             document.getElementById('set-sprint-qs').value = userSprintQs;
             document.getElementById('set-mock-global-time').value = userMockGlobalTime;
             document.getElementById('set-mock-global-qs').value = userMockGlobalQs;
             document.getElementById('set-practice-qs').value = userPracticeQs;
             document.getElementById('set-calc-qs').value = userCalcQs;
-            document.querySelectorAll('.preset-chip').forEach(c => { c.style.background='white'; c.style.color='#333'; c.style.borderColor='#ccc'; });
-            let activeChip = document.getElementById('preset-' + userMockPreset);
-            if(activeChip) { activeChip.style.background='var(--cbt-blue)'; activeChip.style.color='white'; activeChip.style.borderColor='var(--cbt-blue)'; }
+            
             
             // Populate Tests Tab Subjects
             const modalContainer = document.getElementById('modal-subject-toggles');
@@ -1024,48 +1024,140 @@
             }
         }
 
-        function applyMockPreset(preset) {
-            userMockPreset = preset;
-            
-            // 1. Visually update the chips
-            document.querySelectorAll('.preset-chip').forEach(c => { c.style.background='white'; c.style.color='#333'; c.style.borderColor='#ccc'; });
-            let activeChip = document.getElementById('preset-' + preset);
-            if(activeChip) { activeChip.style.background='var(--cbt-blue)'; activeChip.style.color='white'; activeChip.style.borderColor='var(--cbt-blue)'; }
-            
-            // 2. Apply SSC Tier-II Pattern
-            if(preset === 'ssc-tier2') {
-                // Ensure required subjects are active (Matches official pattern)
-                let requiredSubs = ['Maths', 'Reasoning', 'English', 'GS', 'Computer'];
-                let allBanks = [...new Set(masterBank.map(q => q.subject).filter(Boolean))];
-                
-                requiredSubs.forEach(sub => {
-                    if (allBanks.includes(sub) && !globalActiveSubjects.includes(sub)) {
-                        globalActiveSubjects.push(sub);
-                    }
-                });
-                localStorage.setItem('vu_global_subjects', JSON.stringify(globalActiveSubjects));
-                
-                // Visually update Subject Toggles
-                document.querySelectorAll('#modal-subject-toggles .sub-toggle-btn').forEach(btn => {
-                    if(globalActiveSubjects.includes(btn.innerText)) btn.classList.add('active');
-                    else btn.classList.remove('active');
-                });
+        let isMockLocked = false; 
 
-                // Set Global Limits (135 Mins / 150 Qs)
-                document.getElementById('set-mock-global-time').value = 135; 
-                document.getElementById('set-mock-global-qs').value = 150;
+        // --- 1. THE CORE APPLY LOGIC ---
+        function applyMockPreset(presetId) {
+            activePresetId = presetId;
+            localStorage.setItem('vu_active_preset', activePresetId);
+            
+            let preset = examPresets.find(x => x.id === presetId);
+            if (!preset) preset = examPresets[0]; // Fallback
+            
+            let statusEl = document.getElementById('mock-status-label');
+            if(statusEl) {
+                isMockLocked = preset.locked;
+                if (isMockLocked) {
+                    statusEl.innerHTML = `🔒 Navigation: Locked (Sectional Timing)`;
+                    setSplitMode('custom');
+                } else {
+                    statusEl.innerHTML = `🕒 Navigation: Open (Jump Anywhere)`;
+                    setSplitMode('auto');
+                }
+            }
+
+            document.getElementById('set-mock-global-time').value = preset.time;
+            document.getElementById('set-mock-global-qs').value = preset.qs;
+            
+            renderPresetChips(); // Update visual active states
+            syncFromGlobal(); // Update the grid below
+        }
+
+        // --- 2. RENDER THE CHIPS ---
+        function renderPresetChips() {
+            const container = document.getElementById('dynamic-preset-chips');
+            if(!container) return;
+            container.innerHTML = '';
+            
+            examPresets.forEach(preset => {
+                let btn = document.createElement('button');
+                btn.className = 'btn btn-outline preset-chip';
                 
-                // Force Custom Split Mode
-                setSplitMode('custom');
+                // Active State Styling
+                if (preset.id === activePresetId) {
+                    btn.style.cssText = 'border-radius:20px; font-size:0.8rem; padding:4px 12px; white-space:nowrap; background: var(--cbt-blue); color: white; border-color: var(--cbt-blue);';
+                } else {
+                    btn.style.cssText = 'border-radius:20px; font-size:0.8rem; padding:4px 12px; white-space:nowrap; background: white; color: #333; border-color: #ccc;';
+                }
                 
-                // Pre-fill the specific Sectional Data
-                userMockSecData['Maths'] = { time: 30, qs: 30 };
-                userMockSecData['Reasoning'] = { time: 30, qs: 30 };
-                userMockSecData['English'] = { time: 35, qs: 45 };
-                userMockSecData['GS'] = { time: 25, qs: 25 };
-                userMockSecData['Computer'] = { time: 15, qs: 20 };
-                
-                renderSectionalDistribution();
+                btn.innerText = preset.name;
+
+                // Click to Apply
+                btn.onclick = (e) => { applyMockPreset(preset.id); };
+
+                // Add Edit Gear
+                let editSpan = document.createElement('span');
+                editSpan.innerHTML = ' ⚙️';
+                editSpan.style.cursor = 'pointer';
+                editSpan.style.opacity = '0.7';
+                editSpan.title = "Edit Exam";
+                editSpan.onclick = (e) => {
+                    e.stopPropagation(); // Don't trigger the apply click
+                    openPresetEditor(preset.id);
+                };
+                btn.appendChild(editSpan);
+
+                container.appendChild(btn);
+            });
+        }
+
+        // --- 3. EDITOR MODAL CONTROLS ---
+        function openPresetEditor(id) {
+            document.getElementById('preset-editor-overlay').style.display = 'flex';
+            const delBtn = document.getElementById('btn-delete-preset');
+
+            if (id) {
+                // Edit Existing Preset
+                let p = examPresets.find(x => x.id === id);
+                if(p) {
+                    document.getElementById('preset-modal-title').innerText = '✏️ Edit Exam';
+                    document.getElementById('edit-preset-id').value = p.id;
+                    document.getElementById('edit-preset-name').value = p.name;
+                    document.getElementById('edit-preset-time').value = p.time;
+                    document.getElementById('edit-preset-qs').value = p.qs;
+                    document.querySelector(`input[name="edit-preset-lock"][value="${p.locked}"]`).checked = true;
+                    document.getElementById('edit-preset-buckets').value = p.buckets || '';
+                    
+                    // Protect the default 'custom' chip from deletion
+                    delBtn.style.display = (id === 'custom') ? 'none' : 'block';
+                }
+            } else {
+                // Create New Preset
+                document.getElementById('preset-modal-title').innerText = '➕ New Exam';
+                document.getElementById('edit-preset-id').value = '';
+                document.getElementById('edit-preset-name').value = 'New Exam';
+                document.getElementById('edit-preset-time').value = 60;
+                document.getElementById('edit-preset-qs').value = 100;
+                document.querySelector(`input[name="edit-preset-lock"][value="false"]`).checked = true;
+                document.getElementById('edit-preset-buckets').value = '';
+                delBtn.style.display = 'none';
+            }
+        }
+
+        function closePresetEditor() { document.getElementById('preset-editor-overlay').style.display = 'none'; }
+
+        // --- 4. SAVE & DELETE EXAMS ---
+        function savePresetData() {
+            let id = document.getElementById('edit-preset-id').value;
+            let name = document.getElementById('edit-preset-name').value.trim() || 'Unnamed Exam';
+            let time = parseInt(document.getElementById('edit-preset-time').value) || 60;
+            let qs = parseInt(document.getElementById('edit-preset-qs').value) || 100;
+            let locked = document.querySelector('input[name="edit-preset-lock"]:checked').value === 'true';
+            let buckets = document.getElementById('edit-preset-buckets').value.trim();
+
+            if (id) {
+                let idx = examPresets.findIndex(x => x.id === id);
+                if(idx > -1) examPresets[idx] = { id, name, time, qs, locked, buckets };
+            } else {
+                let newId = 'preset_' + Date.now();
+                examPresets.push({ id: newId, name, time, qs, locked, buckets });
+                id = newId;
+            }
+
+            localStorage.setItem('vu_exam_presets', JSON.stringify(examPresets));
+            closePresetEditor();
+            applyMockPreset(id); // Instantly apply and render
+        }
+
+        function deleteActivePreset() {
+            let id = document.getElementById('edit-preset-id').value;
+            if (id === 'custom') return; 
+            
+            if(confirm("Delete this exam preset permanently?")) {
+                examPresets = examPresets.filter(x => x.id !== id);
+                localStorage.setItem('vu_exam_presets', JSON.stringify(examPresets));
+                closePresetEditor();
+                applyMockPreset('custom'); // Fallback to custom
             }
         }
 
