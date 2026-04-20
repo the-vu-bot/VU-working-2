@@ -2205,9 +2205,42 @@
             container.innerHTML = html;
         }
 
-        // Placeholder for Phase 4
+       // --- PHASE 4: THE BOOM RE-HYDRATION LOGIC 💥 ---
         function rehydrateTest(index) {
-            alert("The Boom Effect (Phase 4)! Ready to rehydrate test index: " + index);
+            try {
+                // 1. Grab the compressed payload from the hidden textarea
+                const payloadString = document.getElementById(`payload-data-${index}`).value;
+                const payload = JSON.parse(payloadString);
+
+                // 2. Rebuild the Questions Array (The Time Machine)
+                // We match the saved UIDs to your current Master Bank to get the question text
+                questions = payload.uids.map(uid => masterBank.find(q => q.uid === uid)).filter(Boolean);
+
+                if (questions.length === 0) {
+                    alert("❌ Error: Could not match UIDs. Have you deleted these questions from your Master Bank?");
+                    return;
+                }
+
+                // 3. Restore the precise test state and timers
+                state = payload.state;
+                mockBoundaries = payload.mockBoundaries;
+                timeSpentGlobal = payload.timeSpentGlobal;
+                
+                // Change the label so you know you are looking at an archived test
+                examType = 'VAULT ARCHIVE'; 
+                currentMode = 'analysis';
+
+                // 4. THE BOOM: Render the analytics and switch screens instantly
+                renderAnalyticsDisplay();
+                
+                document.getElementById('journey-screen').style.display = 'none';
+                document.getElementById('analysis-screen').style.display = 'flex';
+
+                console.log("💥 Test Rehydrated Successfully!");
+            } catch (error) {
+                console.error("Rehydration Error:", error);
+                alert("❌ Failed to rehydrate this test. The data payload might be corrupted.");
+            }
         }
 
         // --- PHASE 4: THE VU JOURNEY VAULT SYNC ---
