@@ -382,6 +382,16 @@
 
                     <div class="settings-section">
                         <div class="settings-section-title" style="color: #d9a05b;">⚡ Sprint Configuration</div>
+                        <div class="settings-section">
+                        <div class="settings-section-title" style="color: var(--cbt-green);">🧠 Practice Configuration</div>
+                        <div class="settings-row" style="background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
+                            <div style="flex:1;"><strong style="color:#333;">Practice Limits</strong><div style="font-size:0.75rem; color:#888;">Max Qs per session.</div></div>
+                            <div class="aligned-input-grid" style="grid-template-columns: 50px 20px;">
+                                <input type="number" id="set-practice-qs" class="settings-input" value="50">
+                                <span style="font-size:0.8rem; color:#888;">Qs</span>
+                            </div>
+                        </div>
+                    </div>
                         <div class="settings-row" style="background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
                             <div style="flex:1;"><strong style="color:#333;">Sprint Limits</strong><div style="font-size:0.75rem; color:#888;">Mins & Qs per sprint.</div></div>
                             <div class="aligned-input-grid">
@@ -419,6 +429,16 @@
                 <div id="pane-calc" class="settings-pane">
                     <div class="settings-section">
                         <div class="settings-section-title" style="color: var(--cbt-blue);">🧮 Active Calc Topics Filter</div>
+                        <div class="settings-section">
+                        <div class="settings-section-title" style="color: var(--cbt-red);">🧮 Calc Drill Configuration</div>
+                        <div class="settings-row" style="background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
+                            <div style="flex:1;"><strong style="color:#333;">Drill Limits</strong><div style="font-size:0.75rem; color:#888;">Max Qs per drill.</div></div>
+                            <div class="aligned-input-grid" style="grid-template-columns: 50px 20px;">
+                                <input type="number" id="set-calc-qs" class="settings-input" value="50">
+                                <span style="font-size:0.8rem; color:#888;">Qs</span>
+                            </div>
+                        </div>
+                    </div>
                         <div style="font-size:0.8rem; color:#888; margin-bottom:10px;">Select which operations to include in your Calculation Drills.</div>
                         <div class="subject-toggle-container" id="modal-calc-toggles"></div>
                     </div>
@@ -441,6 +461,19 @@
         </div>
     </div>
 
+    <div id="summary-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; z-index: 10001;">
+        <div class="settings-card" style="max-width: 450px; width: 90%;">
+            <div class="settings-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    Vault Summary <span style="cursor:pointer; color:#888;" onclick="closeSummaryModal()">✖</span>
+                </div>
+            </div>
+            <div class="settings-body" id="summary-body" style="padding: 20px; max-height: 60vh; overflow-y: auto;">
+                Loading summary...
+            </div>
+        </div>
+    </div>
+
     <div id="home-screen" style="display: none;">
         <div class="home-card">
             <div class="home-header-row">
@@ -452,7 +485,7 @@
                     <div>
                         <h1 class="home-title">EXAM ENGINE</h1>
                         <div class="home-tagline">The VU Power</div>
-                        <div class="home-subtitle" id="db-stats" style="margin-bottom:0;">Loading Intelligence...</div>
+                        <div class="home-subtitle" id="db-stats" style="margin-bottom:0; cursor:pointer; text-decoration:underline;" onclick="openSummaryModal()">Loading Intelligence...</div>
                     </div>
                 </div>
                 <div class="settings-vault">
@@ -739,6 +772,8 @@
         let userMockGlobalQs = parseInt(localStorage.getItem('vu_mock_global_qs')) || 100;
         let userMockSplitMode = localStorage.getItem('vu_mock_split_mode') || 'auto';
         let userMockSecData = JSON.parse(localStorage.getItem('vu_mock_sec_data') || '{}');
+        let userPracticeQs = parseInt(localStorage.getItem('vu_practice_qs')) || 50;
+        let userCalcQs = parseInt(localStorage.getItem('vu_calc_qs')) || 50;
 
         // Review Mode Filters (Phase 3)
         let reviewFilteredIndices = [];
@@ -768,6 +803,8 @@
             document.getElementById('set-sprint-qs').value = userSprintQs;
             document.getElementById('set-mock-global-time').value = userMockGlobalTime;
             document.getElementById('set-mock-global-qs').value = userMockGlobalQs;
+            document.getElementById('set-practice-qs').value = userPracticeQs;
+            document.getElementById('set-calc-qs').value = userCalcQs;
             
             // Populate Tests Tab Subjects
             const modalContainer = document.getElementById('modal-subject-toggles');
@@ -801,6 +838,36 @@
         }
 
         function closeSettings() { document.getElementById('settings-overlay').style.display = 'none'; }
+
+        function openSummaryModal() {
+            let html = '<div style="display:flex; flex-direction:column; gap:15px;">';
+            let mainStats = {}; let calcStats = {};
+            
+            masterBank.forEach(q => {
+                let sub = q.subject || 'Unknown';
+                if (defaultCalcTopics.includes(sub)) calcStats[sub] = (calcStats[sub] || 0) + 1;
+                else mainStats[sub] = (mainStats[sub] || 0) + 1;
+            });
+
+            html += `<div><strong style="color:var(--cbt-blue); font-size:1.05rem;">📚 Main Subjects</strong><div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">`;
+            for (let [sub, count] of Object.entries(mainStats)) {
+                html += `<div style="background:#f4f8fb; padding:8px 12px; border-radius:6px; border:1px solid #dceaf9; display:flex; justify-content:space-between; align-items:center;"><span style="font-size:0.9rem;">${sub}</span><strong style="color:var(--cbt-blue);">${count}</strong></div>`;
+            }
+            html += `</div></div>`;
+
+            if (Object.keys(calcStats).length > 0) {
+                html += `<div style="margin-top:10px;"><strong style="color:var(--cbt-purple); font-size:1.05rem;">🧮 Calculation Topics</strong><div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">`;
+                for (let [sub, count] of Object.entries(calcStats)) {
+                    html += `<div style="background:#fdfaf4; padding:8px 12px; border-radius:6px; border:1px solid #f5e6d3; display:flex; justify-content:space-between; align-items:center;"><span style="font-size:0.9rem;">${sub}</span><strong style="color:var(--cbt-purple);">${count}</strong></div>`;
+                }
+                html += `</div></div></div>`;
+            } else html += '</div>';
+
+            document.getElementById('summary-body').innerHTML = html;
+            document.getElementById('summary-overlay').style.display = 'flex';
+        }
+
+        function closeSummaryModal() { document.getElementById('summary-overlay').style.display = 'none'; }
 
         function switchSettingsTab(tabName) {
             document.querySelectorAll('.master-tab').forEach(t => t.classList.remove('active'));
@@ -912,6 +979,10 @@
             localStorage.setItem('vu_mock_global_qs', userMockGlobalQs);
             localStorage.setItem('vu_mock_split_mode', userMockSplitMode);
             localStorage.setItem('vu_mock_sec_data', JSON.stringify(userMockSecData));
+            userPracticeQs = parseInt(document.getElementById('set-practice-qs').value) || 50;
+            userCalcQs = parseInt(document.getElementById('set-calc-qs').value) || 50;
+            localStorage.setItem('vu_practice_qs', userPracticeQs);
+            localStorage.setItem('vu_calc_qs', userCalcQs);
             updateDashboardDropdowns();
             closeSettings();
         }
@@ -1399,8 +1470,8 @@
                     if (subject !== 'all') filtered = masterBank.filter(q => q.subject === subject && globalActiveSubjects.includes(q.subject));
                     else filtered = masterBank.filter(q => globalActiveSubjects.includes(q.subject));
                 }
-                questions = type === 'sprint' ? getSmartSelection(filtered, userSprintQs) : getSmartSelection(filtered, 50);
-                questions = shuffleOptionsForQuestions(questions);
+                let targetQs = type === 'sprint' ? userSprintQs : (isCalcDrill ? userCalcQs : userPracticeQs);
+                questions = getSmartSelection(filtered, targetQs);                questions = shuffleOptionsForQuestions(questions);
                 if(questions.length === 0) { alert("No questions found for this category!"); return; }
                 activeSectionIndex = 0; 
                 mockBoundaries = [{ name: isCalcDrill ? 'CALCULATION' : (subject === 'all' ? 'MIXED' : subject), start: 0, end: questions.length - 1 }];
@@ -2179,6 +2250,15 @@
                         toggleMobilePalette();
                     }
                 }
+            }
+            // Global Backdrop Click Logic for Modals
+            let settingsOverlay = document.getElementById('settings-overlay');
+            if (settingsOverlay && settingsOverlay.style.display === 'flex' && event.target === settingsOverlay) {
+                closeSettings();
+            }
+            let summaryOverlay = document.getElementById('summary-overlay');
+            if (summaryOverlay && summaryOverlay.style.display === 'flex' && event.target === summaryOverlay) {
+                closeSummaryModal();
             }
         });
 
