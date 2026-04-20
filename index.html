@@ -382,22 +382,23 @@
 
                     <div class="settings-section">
                         <div class="settings-section-title" style="color: #d9a05b;">⚡ Sprint Configuration</div>
-                        <div class="settings-section">
-                        <div class="settings-section-title" style="color: var(--cbt-green);">🧠 Practice Configuration</div>
-                        <div class="settings-row" style="background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
-                            <div style="flex:1;"><strong style="color:#333;">Practice Limits</strong><div style="font-size:0.75rem; color:#888;">Max Qs per session.</div></div>
-                            <div class="aligned-input-grid" style="grid-template-columns: 50px 20px;">
-                                <input type="number" id="set-practice-qs" class="settings-input" value="50">
-                                <span style="font-size:0.8rem; color:#888;">Qs</span>
-                            </div>
-                        </div>
-                    </div>
                         <div class="settings-row" style="background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
                             <div style="flex:1;"><strong style="color:#333;">Sprint Limits</strong><div style="font-size:0.75rem; color:#888;">Mins & Qs per sprint.</div></div>
                             <div class="aligned-input-grid">
                                 <input type="number" id="set-sprint-time" class="settings-input" value="15">
                                 <span style="font-size:0.8rem; color:#888;">Min</span>
                                 <input type="number" id="set-sprint-qs" class="settings-input" value="25">
+                                <span style="font-size:0.8rem; color:#888;">Qs</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="settings-section-title" style="color: var(--cbt-green);">🧠 Practice Configuration</div>
+                        <div class="settings-row" style="background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
+                            <div style="flex:1;"><strong style="color:#333;">Practice Limits</strong><div style="font-size:0.75rem; color:#888;">Max Qs per session.</div></div>
+                            <div class="aligned-input-grid" style="grid-template-columns: 50px 20px;">
+                                <input type="number" id="set-practice-qs" class="settings-input" value="50">
                                 <span style="font-size:0.8rem; color:#888;">Qs</span>
                             </div>
                         </div>
@@ -429,6 +430,16 @@
                 <div id="pane-calc" class="settings-pane">
                     <div class="settings-section">
                         <div class="settings-section-title" style="color: var(--cbt-blue);">🧮 Active Calc Topics Filter</div>
+                        <div class="settings-section">
+                        <div class="settings-section-title" style="color: var(--cbt-red);">🧮 Calc Drill Configuration</div>
+                        <div class="settings-row" style="background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
+                            <div style="flex:1;"><strong style="color:#333;">Drill Limits</strong><div style="font-size:0.75rem; color:#888;">Max Qs per drill.</div></div>
+                            <div class="aligned-input-grid" style="grid-template-columns: 50px 20px;">
+                                <input type="number" id="set-calc-qs" class="settings-input" value="50">
+                                <span style="font-size:0.8rem; color:#888;">Qs</span>
+                            </div>
+                        </div>
+                    </div>
                         <div class="settings-section">
                         <div class="settings-section-title" style="color: var(--cbt-red);">🧮 Calc Drill Configuration</div>
                         <div class="settings-row" style="background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
@@ -839,32 +850,53 @@
 
         function closeSettings() { document.getElementById('settings-overlay').style.display = 'none'; }
 
-        function openSummaryModal() {
+        async function openSummaryModal() {
+            // Show loading state first
+            document.getElementById('summary-body').innerHTML = '<div style="text-align:center; color:#888; padding: 20px;">Fetching Vault Intelligence... ⏳</div>';
+            document.getElementById('summary-overlay').style.display = 'flex';
+
             let html = '<div style="display:flex; flex-direction:column; gap:15px;">';
             let mainStats = {}; let calcStats = {};
             
+            // 1. Tally Main Subjects (Already in memory)
             masterBank.forEach(q => {
                 let sub = q.subject || 'Unknown';
-                if (defaultCalcTopics.includes(sub)) calcStats[sub] = (calcStats[sub] || 0) + 1;
-                else mainStats[sub] = (mainStats[sub] || 0) + 1;
+                mainStats[sub] = (mainStats[sub] || 0) + 1;
             });
 
+            // 2. Fetch Calc Subjects Silently
+            const currentKey = localStorage.getItem('vu_unlocked_key');
+            if (currentKey) {
+                try {
+                    const response = await fetch(currentKey + '_calc.json?t=' + new Date().getTime());
+                    if (response.ok) {
+                        let calcBank = await response.json();
+                        calcBank.forEach(q => {
+                            let sub = q.subject || 'Unknown';
+                            calcStats[sub] = (calcStats[sub] || 0) + 1;
+                        });
+                    }
+                } catch (e) { console.log("Calc summary fetch failed."); }
+            }
+
+            // 3. Build Main Subjects UI
             html += `<div><strong style="color:var(--cbt-blue); font-size:1.05rem;">📚 Main Subjects</strong><div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">`;
             for (let [sub, count] of Object.entries(mainStats)) {
-                html += `<div style="background:#f4f8fb; padding:8px 12px; border-radius:6px; border:1px solid #dceaf9; display:flex; justify-content:space-between; align-items:center;"><span style="font-size:0.9rem;">${sub}</span><strong style="color:var(--cbt-blue);">${count}</strong></div>`;
+                html += `<div style="background:#f4f8fb; padding:8px 12px; border-radius:6px; border:1px solid #dceaf9; display:flex; justify-content:space-between; align-items:center;"><span style="font-size:0.9rem; font-weight:bold; color:#555;">${sub}</span><strong style="color:var(--cbt-blue);">${count}</strong></div>`;
             }
             html += `</div></div>`;
 
+            // 4. Build Calc Topics UI (If they exist)
             if (Object.keys(calcStats).length > 0) {
                 html += `<div style="margin-top:10px;"><strong style="color:var(--cbt-purple); font-size:1.05rem;">🧮 Calculation Topics</strong><div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">`;
                 for (let [sub, count] of Object.entries(calcStats)) {
-                    html += `<div style="background:#fdfaf4; padding:8px 12px; border-radius:6px; border:1px solid #f5e6d3; display:flex; justify-content:space-between; align-items:center;"><span style="font-size:0.9rem;">${sub}</span><strong style="color:var(--cbt-purple);">${count}</strong></div>`;
+                    html += `<div style="background:#fdfaf4; padding:8px 12px; border-radius:6px; border:1px solid #f5e6d3; display:flex; justify-content:space-between; align-items:center;"><span style="font-size:0.9rem; font-weight:bold; color:#555;">${sub}</span><strong style="color:var(--cbt-purple);">${count}</strong></div>`;
                 }
-                html += `</div></div></div>`;
-            } else html += '</div>';
-
+                html += `</div></div>`;
+            } 
+            
+            html += '</div>';
             document.getElementById('summary-body').innerHTML = html;
-            document.getElementById('summary-overlay').style.display = 'flex';
         }
 
         function closeSummaryModal() { document.getElementById('summary-overlay').style.display = 'none'; }
