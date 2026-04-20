@@ -2156,8 +2156,12 @@
             // Fire and forget to Google Sheets (using text/plain prevents CORS blocking)
             fetch(JOURNEY_API_URL, {
                 method: 'POST',
+                mode: 'no-cors', // <-- CRUCIAL FIX: Tells browser to ignore CORS restrictions
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8', 
+                },
                 body: JSON.stringify(postData)
-            }).then(() => console.log("✅ Journey Recorded!"))
+            }).then(() => console.log("✅ Journey Request Sent!"))
               .catch(e => console.error("❌ Journey log failed", e));
         }
 
