@@ -1905,10 +1905,11 @@
             }).catch(err => {});
         }
 
-        if (examType === 'mock' && currentMode === 'test' && mockPhysicsMode !== 'open') {
-        let currentBounds = mockBoundaries[activeSectionIndex];
-        if (index < currentBounds.start || index > currentBounds.end) return;
-    }
+        function loadQuestion(index) {  // <--- ADD THIS LINE BACK
+            if (examType === 'mock' && currentMode === 'test' && mockPhysicsMode !== 'open') {
+                let currentBounds = mockBoundaries[activeSectionIndex];
+                if (index < currentBounds.start || index > currentBounds.end) return;
+            }
             currentQ = index;
             const q = questions[currentQ];
 
