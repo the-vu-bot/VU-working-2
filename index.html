@@ -2219,9 +2219,44 @@
             </div>`;
         }
 
+        // --- NEW EXTRACTED DEEP-DIVE SLICER ---
+        function renderDeepDiveSlicer() {
+            if (journeyFilterType !== 'mock') {
+                activeMockSubject = 'Overall';
+                return '';
+            }
+            
+            // Auto-detect available subjects from your Vault memory
+            let availableSubjects = new Set();
+            cachedJourneyData.forEach(d => {
+                if(d.ExamType === 'Full Mock') {
+                    Object.keys(d).forEach(key => {
+                        if (key.endsWith('_Score')) availableSubjects.add(key.replace('_Score', ''));
+                    });
+                }
+            });
+
+            if (availableSubjects.size === 0) return '';
+
+            let html = `<div style="display:flex; justify-content:center; gap:8px; margin-bottom:20px; flex-wrap:wrap; background: white; padding: 12px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                <strong style="width: 100%; text-align: center; color: var(--cbt-purple); font-size: 0.9rem; margin-bottom: 5px;">Subject Deep-Dive</strong>
+                <button class="filter-chip ${activeMockSubject==='Overall'?'active':''}" onclick="switchMockSubject('Overall')">Overall</button>`;
+            
+            availableSubjects.forEach(sub => {
+                html += `<button class="filter-chip ${activeMockSubject===sub?'active':''}" onclick="switchMockSubject('${sub}')">${sub}</button>`;
+            });
+            html += `</div>`;
+            return html;
+        }
+
         function renderJourneyFeed(data) {
             const container = document.getElementById('journey-feed-area');
+            
+            // 1. Render Main Filters
             let html = renderSlicer();
+            
+            // 2. Render Deep Dive Panel (Moved here!)
+            html += renderDeepDiveSlicer();
 
             if (!data || data.length === 0) {
                 html += '<div style="text-align:center; color:#888; margin-top: 50px;">No tests match these filters. Take some tests to build your legacy!</div>';
@@ -2229,11 +2264,14 @@
                 return;
             }
 
+            // 3. Render "Showing X Tests" card
             html += `<div class="dashboard-card" style="padding: 15px; margin-bottom: 20px; text-align: center;"><h3 style="margin: 0; color: var(--cbt-purple);">Showing: ${data.length} Tests</h3></div>`;
+            
+            // 4. Render the Charts
             html += generateAdvancedCharts(data);
 
+            // 5. Render the Test Cards
             data.forEach((test) => {
-                // We use the absolute index from the master array so Re-hydration grabs the exact right payload!
                 let absoluteIndex = cachedJourneyData.indexOf(test); 
                 let dateObj = new Date(test.Timestamp);
                 let dateStr = dateObj.toLocaleDateString('en-IN') + " • " + dateObj.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
@@ -2274,14 +2312,12 @@
         }
 
         function createSingleSVG(chartData, key, title, color) {
-            // Smart extraction: Checks if the data exists, and converts time properly
             let extractVal = (d) => {
                 if(d[key] === undefined || d[key] === null || d[key] === '') return null; 
                 if(key.includes('Time')) return parseFloat((d[key] / 60).toFixed(1)); 
                 return parseFloat(d[key]);
             };
 
-            // Filter out tests that didn't include this specific subject to prevent chart crashes
             let validData = chartData.filter(d => extractVal(d) !== null);
             
             if(validData.length < 2) {
@@ -2321,30 +2357,6 @@
             let chartData = [...data].slice(0, 15).reverse(); 
             let isMobile = window.innerWidth <= 768; 
             let html = '<div style="margin-bottom: 20px;">';
-
-            // --- THE DEEP DIVE MOCK TOGGLES ---
-            if (journeyFilterType === 'mock') {
-                // Auto-detect which subjects exist in your Google Sheet data
-                let availableSubjects = new Set();
-                data.forEach(d => {
-                    Object.keys(d).forEach(key => {
-                        if (key.endsWith('_Score')) availableSubjects.add(key.replace('_Score', ''));
-                    });
-                });
-
-                if (availableSubjects.size > 0) {
-                    html += `<div style="display:flex; justify-content:center; gap:8px; margin-bottom:15px; flex-wrap:wrap; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                        <strong style="width: 100%; text-align: center; color: var(--cbt-purple); font-size: 0.85rem; margin-bottom: 5px;">Subject Deep-Dive</strong>
-                        <button class="filter-chip ${activeMockSubject==='Overall'?'active':''}" onclick="switchMockSubject('Overall')">Overall</button>`;
-                    
-                    availableSubjects.forEach(sub => {
-                        html += `<button class="filter-chip ${activeMockSubject===sub?'active':''}" onclick="switchMockSubject('${sub}')">${sub}</button>`;
-                    });
-                    html += `</div>`;
-                }
-            } else {
-                activeMockSubject = 'Overall'; // Reset if not looking at Full Mocks
-            }
 
             // --- MOBILE METRIC TABS ---
             if (isMobile) {
