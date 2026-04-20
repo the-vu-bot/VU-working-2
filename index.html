@@ -684,6 +684,7 @@
 
     <script>
         // GLOBAL VARIABLES
+        const JOURNEY_API_URL = "https://script.google.com/macros/s/AKfycbx4y8S2YtrEuzp2ZV_a83rmy5OVHf54QeaXXd3K5s4ZiFhotmWSzqjsn2809fwx4oaP/exec"; // <-- PASTE YOUR URL HERE
         let masterBank = [];
         let questions = [];
         let state = []; 
@@ -1781,6 +1782,9 @@
             localStorage.setItem(STORAGE_TIME, JSON.stringify(timeMap));
 
             renderAnalyticsDisplay(); showDashboard(); saveTestState(); 
+            
+            // NEW: Save to Google Sheets
+            pushToJourneyVault(); 
         }
 
         function renderAnalyticsDisplay() {
@@ -2115,6 +2119,47 @@
                 }
             }
         });
+
+        // --- PHASE 4: THE VU JOURNEY VAULT SYNC ---
+        function pushToJourneyVault() {
+            if (!JOURNEY_API_URL || JOURNEY_API_URL === "YOUR_WEB_APP_URL_HERE") return;
+            
+            let correct = 0, attempted = 0, wrongTotal = 0;
+            state.forEach((s, i) => {
+                if(s.selected !== null) {
+                    attempted++;
+                    if(s.selected === questions[i].correct) correct++; 
+                    else wrongTotal++;
+                }
+            });
+            let finalScore = (correct - (wrongTotal / 3)).toFixed(2);
+            let acc = attempted > 0 ? Math.round((correct/attempted)*100) : 0;
+            let examLabel = examType === 'mock' ? 'Full Mock' : `Sprint: ${questions[0]?.subject || 'Mixed'}`;
+
+            // The exact data needed to "Re-hydrate" the test later
+            let payloadObj = {
+                uids: questions.map(q => q.uid),
+                state: state,
+                mockBoundaries: mockBoundaries,
+                timeSpentGlobal: timeSpentGlobal
+            };
+
+            let postData = {
+                timestamp: new Date().toISOString(),
+                examType: examLabel,
+                score: finalScore,
+                accuracy: acc,
+                timeSpent: timeSpentGlobal,
+                payload: JSON.stringify(payloadObj)
+            };
+
+            // Fire and forget to Google Sheets (using text/plain prevents CORS blocking)
+            fetch(JOURNEY_API_URL, {
+                method: 'POST',
+                body: JSON.stringify(postData)
+            }).then(() => console.log("✅ Journey Recorded!"))
+              .catch(e => console.error("❌ Journey log failed", e));
+        }
 
         window.onload = () => { checkAuth(); };
     </script>
