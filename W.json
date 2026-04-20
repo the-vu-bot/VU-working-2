@@ -2110,18 +2110,6 @@
     "trap": "Don't confuse it with Tatpurush. Break it down: Prati + Ek."
   },
   {
-    "uid": "VU-20260414-0536",
-    "subject": "GS",
-    "topic": "Computer Basics",
-    "q_en": "In the context of 'O' Level networking, what does the 'S' in HTTPS stand for?",
-    "q_hi": "नेटवर्किंग के संदर्भ में, HTTPS में 'S' का क्या अर्थ है?",
-    "options_en": ["Standard", "Secure", "Socket", "Service"],
-    "options_hi": ["स्टैंडर्ड (Standard)", "सिक्योर (Secure)", "सॉकेट (Socket)", "सर्विस (Service)"],
-    "correct": 1,
-    "logic": "HTTPS = HyperText Transfer Protocol Secure. It uses SSL/TLS for encryption.",
-    "trap": "Don't pick 'Standard'. Encryption is the primary purpose of the S."
-  },
-  {
     "uid": "VU-20260414-0537",
     "subject": "Maths",
     "topic": "Profit & Loss",
