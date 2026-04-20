@@ -2431,7 +2431,7 @@
             }
 
             // 3. Render "Showing X Tests" card
-            html += `<div class="dashboard-card" style="padding: 15px; margin-bottom: 20px; text-align: center;"><h3 style="margin: 0; color: var(--cbt-purple);">Showing: ${data.length} Tests</h3></div>`;
+            html += `<div class="dashboard-card" style="max-width: 100%; padding: 15px; margin-bottom: 20px; text-align: center;"><h3 style="margin: 0; color: var(--cbt-purple);">Showing: ${data.length} Tests</h3></div>`;
             
             // 4. Render the Charts
             html += generateAdvancedCharts(data);
