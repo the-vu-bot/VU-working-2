@@ -2180,15 +2180,22 @@
                 <div style="font-size: 0.85rem; color: #888;">Sorted by newest first</div>
             </div>`;
 
+            // Add the Visual Analytics Line Chart
+            html += generateSVGChart(data);
+
             data.forEach((test, index) => {
                 let dateObj = new Date(test.Timestamp);
                 let dateStr = dateObj.toLocaleDateString('en-IN') + " • " + dateObj.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
+                let rawTimestamp = test.Timestamp; 
                 
                 html += `
                 <div class="rev-card" style="display: flex; flex-direction: column; gap: 10px; border-left: 5px solid var(--cbt-blue);">
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #eee; padding-bottom: 8px;">
                         <strong style="color: #333; font-size: 1.1rem;">${test.ExamType}</strong>
-                        <span style="font-size: 0.85rem; color: #888; font-weight: bold;">${dateStr}</span>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <span style="font-size: 0.85rem; color: #888; font-weight: bold;">${dateStr}</span>
+                            <button onclick="deleteJourneyRecord('${rawTimestamp}', this)" style="background: none; border: none; cursor: pointer; font-size: 1.1rem; opacity: 0.6; padding: 0; transition: 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" title="Delete Test">🗑️</button>
+                        </div>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div style="display: flex; gap: 15px; text-align: center;">
@@ -2203,6 +2210,72 @@
             });
 
             container.innerHTML = html;
+        }
+
+        // --- NEW FEATURE 1: Visual SVG Chart Generator ---
+        function generateSVGChart(data) {
+            if(data.length < 2) return ''; 
+            
+            // Get last 15 tests and reverse so left is oldest, right is newest
+            let chartData = [...data].slice(0, 15).reverse(); 
+            let maxScore = Math.max(...chartData.map(d => parseFloat(d.Score) || 0), 10);
+            let minScore = Math.min(...chartData.map(d => parseFloat(d.Score) || 0), 0);
+            
+            let width = 800; let height = 160; let padding = 25;
+            let pX = (width - padding*2) / Math.max(chartData.length - 1, 1);
+            
+            let points = chartData.map((d, i) => {
+                let score = parseFloat(d.Score) || 0;
+                let y = height - padding - ((score - minScore) / (maxScore - minScore || 1)) * (height - padding*2);
+                return `${padding + (i * pX)},${y}`;
+            }).join(' ');
+
+            let circles = chartData.map((d, i) => {
+                let x = padding + (i * pX); let score = parseFloat(d.Score) || 0;
+                let y = height - padding - ((score - minScore) / (maxScore - minScore || 1)) * (height - padding*2);
+                return `<circle cx="${x}" cy="${y}" r="5" fill="var(--cbt-purple)" stroke="white" stroke-width="2"/>
+                        <text x="${x}" y="${y-12}" font-size="12" font-weight="bold" fill="#555" text-anchor="middle">${score}</text>`;
+            }).join('');
+
+            return `
+            <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); overflow-x: auto;">
+                <h4 style="margin:0 0 15px 0; color:var(--cbt-blue); text-align:center;">Score Progression (Recent)</h4>
+                <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" style="min-width: 500px;">
+                    <line x1="${padding}" y1="${height-padding}" x2="${width-padding}" y2="${height-padding}" stroke="#eee" stroke-width="2" />
+                    <line x1="${padding}" y1="${padding}" x2="${width-padding}" y2="${padding}" stroke="#eee" stroke-width="1" stroke-dasharray="5,5" />
+                    <polyline fill="none" stroke="var(--cbt-blue)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${points}" />
+                    ${circles}
+                </svg>
+            </div>`;
+        }
+
+        // --- NEW FEATURE 2: Vault Data Deletion ---
+        async function deleteJourneyRecord(timestamp, btnEl) {
+            if(!confirm("⚠️ Are you sure you want to permanently delete this test record?")) return;
+            
+            const card = btnEl.closest('.rev-card');
+            card.style.opacity = '0.4';
+            card.style.pointerEvents = 'none';
+            btnEl.innerText = '⏳';
+
+            try {
+                let postData = { action: 'delete', timestamp: timestamp };
+                await fetch(JOURNEY_API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(postData)
+                });
+                
+                // Wait 1.5 seconds for Google Sheets to process the background deletion, then refresh UI
+                setTimeout(() => { fetchJourneyData(); }, 1500); 
+            } catch (error) {
+                console.error(error);
+                alert("❌ Failed to delete record. Check connection.");
+                card.style.opacity = '1';
+                card.style.pointerEvents = 'auto';
+                btnEl.innerText = '🗑️';
+            }
         }
 
        // --- PHASE 4: THE BOOM RE-HYDRATION LOGIC 💥 ---
