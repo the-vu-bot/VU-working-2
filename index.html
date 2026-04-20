@@ -764,7 +764,7 @@
         let cachedJourneyData = [];
         let journeyFilterType = 'all';
         let journeyFilterSubject = 'all';
-        let activeChartTab = 'score';
+        let currentChartMode = 'all'; // Replaced mobile tab variable
         let activeMockSubject = 'Overall';
         // ----------------------------------
         let masterBank = [];
@@ -2433,6 +2433,21 @@
             // 3. Render "Showing X Tests" card
             html += `<div class="dashboard-card" style="max-width: 100%; padding: 15px; margin-bottom: 20px; text-align: center;"><h3 style="margin: 0; color: var(--cbt-purple);">Showing: ${data.length} Tests</h3></div>`;
             
+            // NEW: The Analytics Toggle Bar
+            let btnStyleAll = currentChartMode === 'all' ? `background: var(--cbt-purple); color: white; border-color: var(--cbt-purple);` : `background: white; color: #555; border-color: #ccc;`;
+            let btnStyleScore = currentChartMode === 'score' ? `background: var(--cbt-purple); color: white; border-color: var(--cbt-purple);` : `background: white; color: #555; border-color: #ccc;`;
+            let btnStyleAcc = currentChartMode === 'acc' ? `background: var(--cbt-purple); color: white; border-color: var(--cbt-purple);` : `background: white; color: #555; border-color: #ccc;`;
+            let btnStyleTime = currentChartMode === 'time' ? `background: var(--cbt-purple); color: white; border-color: var(--cbt-purple);` : `background: white; color: #555; border-color: #ccc;`;
+
+            html += `
+            <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+                <button class="btn btn-outline journey-chart-btn" style="border-radius: 20px; padding: 6px 16px; font-weight:bold; ${btnStyleAll}" onclick="switchJourneyChart('all', this)">📊 All Metrics</button>
+                <button class="btn btn-outline journey-chart-btn" style="border-radius: 20px; padding: 6px 16px; font-weight:bold; ${btnStyleScore}" onclick="switchJourneyChart('score', this)">🏆 Score</button>
+                <button class="btn btn-outline journey-chart-btn" style="border-radius: 20px; padding: 6px 16px; font-weight:bold; ${btnStyleAcc}" onclick="switchJourneyChart('acc', this)">🎯 Acc (%)</button>
+                <button class="btn btn-outline journey-chart-btn" style="border-radius: 20px; padding: 6px 16px; font-weight:bold; ${btnStyleTime}" onclick="switchJourneyChart('time', this)">⏱️ Time (m)</button>
+            </div>
+            `;
+
             // 4. Render the Charts
             html += generateAdvancedCharts(data);
 
@@ -2489,17 +2504,13 @@
         }
 
         // --- RESPONSIVE CHART GENERATOR ---
-        function switchChartTab(tab) {
-            activeChartTab = tab;
-            renderJourneyDashboard();
-        }
-
         function switchMockSubject(sub) {
             activeMockSubject = sub;
             renderJourneyDashboard();
         }
 
-        function createSingleSVG(chartData, key, title, color) {
+        function createSingleSVG(chartData, key, title, color, boxId, isVisible) {
+            let displayStyle = isVisible ? 'block' : 'none';
             let extractVal = (d) => {
                 if(d[key] === undefined || d[key] === null || d[key] === '') return null; 
                 if(key.includes('Time')) return parseFloat((d[key] / 60).toFixed(1)); 
@@ -2509,7 +2520,7 @@
             let validData = chartData.filter(d => extractVal(d) !== null);
             
             if(validData.length < 2) {
-                return `<div style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; border: 1px solid #eee; display: flex; align-items: center; justify-content: center; text-align:center; color:#888;">Not enough data for<br>${title}</div>`;
+                return `<div id="${boxId}" style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; border: 1px solid #eee; display: ${displayStyle}; align-items: center; justify-content: center; text-align:center; color:#888;">Not enough data for<br>${title}</div>`;
             }
 
             let maxVal = Math.max(...validData.map(d => extractVal(d)), 10);
@@ -2531,7 +2542,7 @@
             }).join('');
 
             return `
-            <div style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #eee;">
+            <div id="${boxId}" style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #eee; display: ${displayStyle};">
                 <h4 style="margin:0 0 10px 0; color:#333; text-align:center; font-size: 0.95rem;">${title}</h4>
                 <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
                     <line x1="${padding}" y1="${height-padding}" x2="${width-padding}" y2="${height-padding}" stroke="#eee" stroke-width="2" />
@@ -2543,18 +2554,7 @@
 
         function generateAdvancedCharts(data) {
             let chartData = [...data].slice(0, 15).reverse(); 
-            let isMobile = window.innerWidth <= 768; 
             let html = '<div style="margin-bottom: 20px;">';
-
-            // --- MOBILE METRIC TABS ---
-            if (isMobile) {
-                html += `
-                <div style="display:flex; justify-content:center; gap:8px; margin-bottom:15px; flex-wrap:wrap;">
-                    <button class="filter-chip ${activeChartTab==='score'?'active':''}" onclick="switchChartTab('score')">🏆 Score</button>
-                    <button class="filter-chip ${activeChartTab==='acc'?'active':''}" onclick="switchChartTab('acc')">🎯 Acc (%)</button>
-                    <button class="filter-chip ${activeChartTab==='time'?'active':''}" onclick="switchChartTab('time')">⏱️ Time (m)</button>
-                </div>`;
-            }
 
             html += `<div style="display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px;">`;
 
@@ -2564,13 +2564,40 @@
             let timeKey = activeMockSubject === 'Overall' ? 'TimeSpent' : `${activeMockSubject}_Time`;
             let titleSuffix = activeMockSubject === 'Overall' ? '' : ` (${activeMockSubject})`;
 
-            // Draw the Charts
-            if (!isMobile || activeChartTab === 'score') html += createSingleSVG(chartData, scoreKey, '🏆 Score' + titleSuffix, 'var(--cbt-blue)');
-            if (!isMobile || activeChartTab === 'acc') html += createSingleSVG(chartData, accKey, '🎯 Accuracy (%)' + titleSuffix, 'var(--cbt-green)');
-            if (!isMobile || activeChartTab === 'time') html += createSingleSVG(chartData, timeKey, '⏱️ Time (Mins)' + titleSuffix, '#d9a05b');
+            // Draw the Charts with Display States
+            html += createSingleSVG(chartData, scoreKey, '🏆 Score' + titleSuffix, 'var(--cbt-blue)', 'j-chart-score', currentChartMode === 'all' || currentChartMode === 'score');
+            html += createSingleSVG(chartData, accKey, '🎯 Accuracy (%)' + titleSuffix, 'var(--cbt-green)', 'j-chart-acc', currentChartMode === 'all' || currentChartMode === 'acc');
+            html += createSingleSVG(chartData, timeKey, '⏱️ Time (Mins)' + titleSuffix, '#d9a05b', 'j-chart-time', currentChartMode === 'all' || currentChartMode === 'time');
 
             html += `</div></div>`;
             return html;
+        }
+
+        function switchJourneyChart(mode, btnEl) {
+            currentChartMode = mode;
+            // 1. Reset all buttons to inactive state
+            document.querySelectorAll('.journey-chart-btn').forEach(btn => {
+                btn.style.background = 'white';
+                btn.style.color = '#555';
+                btn.style.borderColor = '#ccc';
+            });
+            
+            // 2. Highlight the clicked button
+            btnEl.style.background = 'var(--cbt-purple)';
+            btnEl.style.color = 'white';
+            btnEl.style.borderColor = 'var(--cbt-purple)';
+
+            // 3. Find the chart containers
+            let cScore = document.getElementById('j-chart-score');
+            let cAcc = document.getElementById('j-chart-acc');
+            let cTime = document.getElementById('j-chart-time');
+
+            // 4. Toggle visibility based on selection
+            if(cScore && cAcc && cTime) {
+                cScore.style.display = (mode === 'all' || mode === 'score') ? 'block' : 'none';
+                cAcc.style.display = (mode === 'all' || mode === 'acc') ? 'block' : 'none';
+                cTime.style.display = (mode === 'all' || mode === 'time') ? 'block' : 'none';
+            }
         }
 
         // --- NEW FEATURE 2: Vault Data Deletion ---
