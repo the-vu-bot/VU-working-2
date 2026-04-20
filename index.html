@@ -1805,6 +1805,9 @@
 
             let finalScore = (correct - (wrongTotal / 3)).toFixed(2);
             let acc = attempted > 0 ? Math.round((correct/attempted)*100) : 0;
+            
+            // NEW: Calculate overall unattempted
+            let unattemptedOverall = questions.length - attempted; 
 
             document.getElementById('dash-score').innerText = `${finalScore}`;
             document.getElementById('dash-correct').innerText = correct;
@@ -1815,13 +1818,23 @@
 
             let cardsHtml = '';
             let now = new Date();
+            
+            // Helper function to add leading zeros for alignment
+            const pad = (num) => num.toString().padStart(2, '0');
+
+            // Building the new formatted Insight Text
             let textLog = `VU POWER POSTMORTEM | ${now.toLocaleDateString('en-IN')} ${now.toLocaleTimeString('en-IN')}\n`;
-            textLog += `Mode: ${examType.toUpperCase()}\nScore: ${finalScore}/${questions.length} | Acc: ${acc}% | Time: ${formatTime(timeSpentGlobal)}\n`;
-            textLog += `Overall: Att: ${attempted} | Right: ${correct} | Wrong: ${wrongTotal}\n-------------------------------------------------\n`;
+            textLog += `Mode: ${examType.toUpperCase()}\n`;
+            textLog += `Score: ${finalScore}/${questions.length} | Acc: ${acc}% | Time: ${formatTime(timeSpentGlobal)}\n`;
+            textLog += `Overall: Att: ${attempted}/${questions.length} | Right: ${correct} | Wrong: ${wrongTotal} | unatt: ${pad(unattemptedOverall)}\n-------------------------------------------------\n`;
 
             for(const [sub, data] of Object.entries(subStats)) {
                 if (data.total === 0) continue; 
                 let subAcc = data.att > 0 ? Math.round((data.correct/data.att)*100) : 0;
+                
+                // NEW: Calculate subject unattempted
+                let subUnatt = data.total - data.att; 
+                
                 cardsHtml += `
                     <div class="sub-card">
                         <div class="sub-name">${sub}</div>
@@ -1833,7 +1846,9 @@
                             <div class="metric">Time<span>${formatTime(data.time)}</span></div>
                         </div>
                     </div>`;
-                textLog += `[${sub.toUpperCase()}] Acc: ${subAcc}% | Att: ${data.att}/${data.total} | R: ${data.correct} | W: ${data.wrong} | Time: ${formatTime(data.time)}\n`;
+                    
+                // Append the zero-loss tracking subject row
+                textLog += `[${sub.toUpperCase()}] Acc: ${subAcc}% | Att: ${pad(data.att)}/${pad(data.total)} | R: ${pad(data.correct)} | W: ${pad(data.wrong)} | uatt: ${pad(subUnatt)} | Time: ${formatTime(data.time)}\n`;
             }
             
             document.getElementById('detailed-stats-area').innerHTML = cardsHtml;
