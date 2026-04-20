@@ -2187,8 +2187,14 @@
                 if(currentMode === 'test' || currentMode === 'practice') {
                     let isLocked = false;
                     if(examType === 'mock') {
-                        let secBounds = mockBoundaries[activeSectionIndex];
-                        if (i < secBounds.start || i > secBounds.end) isLocked = true;
+                        let activeSessionId = mockBoundaries[activeSectionIndex].sessionId;
+                        // Determine which session this specific question (i) belongs to
+                        let qBoundary = mockBoundaries.find(b => i >= b.start && i <= b.end);
+                        
+                        // If it's a mock and NOT 'open' mode, lock it if the session IDs don't match
+                        if (mockPhysicsMode !== 'open' && qBoundary && qBoundary.sessionId !== activeSessionId) {
+                            isLocked = true;
+                        }
                     }
 
                     if (isLocked) {
