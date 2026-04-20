@@ -1887,9 +1887,14 @@
         }
 
         function showDashboard() {
+            if (currentMode === 'review') {
+                history.back(); // If UI Back button is clicked in review, trigger Native History
+                return;
+            }
             renderAnalyticsDisplay(); 
             document.getElementById('cbt-screen').style.display = 'none';
             document.getElementById('analysis-screen').style.display = 'flex';
+            pushHistoryState('analysis'); // Track it!
         }
 
         function copyInsights(btnElement) {
@@ -1913,6 +1918,7 @@
             
             document.getElementById('mobile-submit-btn').classList.add('hide-for-review');
             
+            pushHistoryState('review'); // Track it!
             buildPalette(); 
             setupReviewFilters(); 
         }
@@ -1923,6 +1929,7 @@
             currentMode = 'home'; saveTestState();
             document.getElementById('revision-screen').style.display = 'none';
             document.getElementById('home-screen').style.display = 'flex';
+            pushHistoryState('home');
         }
 
         function updateTopicDropdown() {
@@ -1946,6 +1953,7 @@
             globalActiveSubjects.forEach(sub => { optionsHtml += `<option value="${sub}">${sub}</option>`; });
             document.getElementById('rev-subj-filter').innerHTML = optionsHtml;
 
+            pushHistoryState('revision'); // Track it!
             updateTopicDropdown(); renderRevisionFeed(); saveTestState();
         }
 
@@ -2152,6 +2160,7 @@
             currentMode = 'journey';
             document.getElementById('home-screen').style.display = 'none';
             document.getElementById('journey-screen').style.display = 'flex';
+            pushHistoryState('journey'); // Track it!
             fetchJourneyData();
         }
 
@@ -2159,6 +2168,7 @@
             currentMode = 'home';
             document.getElementById('journey-screen').style.display = 'none';
             document.getElementById('home-screen').style.display = 'flex';
+            pushHistoryState('home');
         }
 
         async function fetchJourneyData() {
@@ -2462,6 +2472,8 @@
                 
                 document.getElementById('journey-screen').style.display = 'none';
                 document.getElementById('analysis-screen').style.display = 'flex';
+                
+                pushHistoryState('analysis'); // Track it!
 
                 console.log("💥 Test Rehydrated Successfully!");
             } catch (error) {
@@ -2535,7 +2547,55 @@
               .catch(e => console.error("❌ Journey log failed", e));
         }
 
-        window.onload = () => { checkAuth(); };
+        // --- PHASE 5: SEQUENTIAL NAVIGATION MEMORY (HARDWARE BACK BUTTON) ---
+        function pushHistoryState(mode) {
+            history.pushState({ mode: mode }, '', '');
+        }
+
+        window.addEventListener('popstate', (event) => {
+            const state = event.state;
+            if (state && state.mode) {
+                restoreUIState(state.mode);
+            } else {
+                restoreUIState('home');
+            }
+        });
+
+        function restoreUIState(mode) {
+            // 1. Hide all screens safely
+            document.getElementById('home-screen').style.display = 'none';
+            document.getElementById('journey-screen').style.display = 'none';
+            document.getElementById('revision-screen').style.display = 'none';
+            document.getElementById('analysis-screen').style.display = 'none';
+            document.getElementById('cbt-screen').style.display = 'none';
+            closeSlider(); 
+
+            currentMode = mode;
+
+            // 2. Show the correct screen based on the history state
+            if (mode === 'home') {
+                document.getElementById('home-screen').style.display = 'flex';
+            } else if (mode === 'journey') {
+                document.getElementById('journey-screen').style.display = 'flex';
+                if (!cachedJourneyData || cachedJourneyData.length === 0) fetchJourneyData();
+            } else if (mode === 'revision') {
+                document.getElementById('revision-screen').style.display = 'flex';
+            } else if (mode === 'analysis') {
+                document.getElementById('analysis-screen').style.display = 'flex';
+            } else if (mode === 'review') {
+                document.getElementById('cbt-screen').style.display = 'flex';
+                document.getElementById('action-bar-test').style.display = 'none';
+                document.getElementById('action-bar-review').style.display = 'flex';
+                document.getElementById('review-filter-bar').style.display = 'flex';
+            } else if (mode === 'test' || mode === 'practice') {
+                document.getElementById('cbt-screen').style.display = 'flex'; // Fallback
+            }
+        }
+
+        window.onload = () => { 
+            history.replaceState({ mode: 'home' }, '', ''); // Initialize the history stack
+            checkAuth(); 
+        };
     </script>
 </body>
 </html>
