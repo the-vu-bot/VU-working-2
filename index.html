@@ -518,15 +518,13 @@
     </div>
 
     <div id="journey-screen" style="display: none; flex-direction: column; height: 100%; background: var(--bg); overflow: hidden;">
-        <div class="header" style="background: white; padding: 10px 20px; border-bottom: 2px solid var(--border); flex-shrink: 0; position: sticky; top: 0; z-index: 100; display: flex; align-items: center;">
-            <div class="header-left" style="flex: 1; min-width: 0; justify-content: flex-start;">
+        <div class="header" style="background: white; padding: 10px 20px; border-bottom: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;">
+            <div style="flex: 1; display: flex; justify-content: flex-start;">
                 <div class="home-icon" onclick="exitJourneyPage()">🏠</div>
             </div>
-            <div style="font-size: 1.2rem; font-weight: bold; text-align: center; white-space: nowrap;">The VU Journey</div>
-            <div style="flex: 1; min-width: 0;"></div> </div>
-            </div>
-            <div style="font-size: 1.2rem; font-weight: bold; flex: 1; text-align: center;">The VU Journey</div>
-            <div style="width: 32px;"></div> </div>
+            <div style="font-size: 1.2rem; font-weight: bold; flex: 1; text-align: center; white-space: nowrap;">The VU Journey</div>
+            <div style="flex: 1;"></div>
+        </div>
         
         <div class="analysis-content" style="flex: 1; overflow-y: auto; padding: 20px;">
             <div id="journey-feed-area" style="max-width: 800px; margin: 0 auto; width: 100%;">
@@ -576,12 +574,12 @@
     </div>
 
     <div id="analysis-screen" style="display: none; flex-direction: column; height: 100%; background: var(--bg);">
-        <div class="header" style="background: white; padding: 10px 20px; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 100; display: flex; align-items: center;">
-            <div class="header-left" style="flex: 1; min-width: 0; justify-content: flex-start;">
+        <div class="header" style="background: white; padding: 10px 20px; border-bottom: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;">
+            <div style="flex: 1; display: flex; justify-content: flex-start;">
                 <div class="home-icon" onclick="goHomeAlert()">🏠</div>
             </div>
-            <div style="font-size: 1.2rem; font-weight: bold; text-align: center; white-space: nowrap;">VU || Analytics</div>
-            <div style="flex: 1; display: flex; justify-content: flex-end; min-width: 0;">
+            <div style="font-size: 1.2rem; font-weight: bold; flex: 1; text-align: center; white-space: nowrap;">VU || Analytics</div>
+            <div style="flex: 1; display: flex; justify-content: flex-end;">
                 <button class="btn btn-blue" style="padding: 6px 12px; font-size: 0.9rem; margin: 0;" onclick="startReviewMode()">👁 Solutions</button>
             </div>
         </div>
