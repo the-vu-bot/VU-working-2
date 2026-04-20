@@ -413,7 +413,7 @@
 
                     <div class="settings-section">
                         <div class="settings-section-title" style="color: #d9534f;">🏆 Full Mock Configuration</div>
-                        <div style="display:flex; gap:8px; margin-bottom:12px; overflow-x:auto; padding-bottom:5px;">
+                        <div id="dynamic-preset-chips" style="display:flex; gap:8px; margin-bottom:12px; overflow-x:auto; padding-bottom:5px; align-items:center;"></div>
                             <button id="preset-custom" class="btn btn-outline preset-chip" style="border-radius:20px; font-size:0.8rem; padding:4px 12px; border-color:var(--cbt-blue); background:var(--cbt-blue); color:white;" onclick="applyMockPreset('custom')">Custom</button>
                             <button id="preset-ssc-tier2" class="btn btn-outline preset-chip" style="border-radius:20px; font-size:0.8rem; padding:4px 12px;" onclick="applyMockPreset('ssc-tier2')">SSC Tier-II</button>
                         </div>
@@ -461,6 +461,59 @@
             <div class="settings-footer">
                 <button class="btn btn-outline" onclick="closeSettings()">Cancel</button>
                 <button class="btn btn-blue" onclick="saveSettings()">Save & Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="preset-editor-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; z-index: 10005;">
+        <div class="settings-card" style="max-width: 450px; width: 95%;">
+            <div class="settings-header" style="background: var(--cbt-purple); color: white;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span id="preset-modal-title">🛠️ Exam Architect</span>
+                    <span style="cursor:pointer; color:#eee;" onclick="closePresetEditor()">✖</span>
+                </div>
+            </div>
+            <div class="settings-body" style="padding: 20px;">
+                <input type="hidden" id="edit-preset-id">
+                
+                <label style="font-weight:bold; font-size:0.9rem; color:#333;">Exam Name</label>
+                <input type="text" id="edit-preset-name" class="settings-input" style="text-align:left; margin-bottom:15px; width:100%;" placeholder="e.g., Selection Post Phase XII">
+                
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="flex:1;">
+                        <label style="font-weight:bold; font-size:0.85rem; color:#555;">Total Time (Mins)</label>
+                        <input type="number" id="edit-preset-time" class="settings-input" style="width:100%;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-weight:bold; font-size:0.85rem; color:#555;">Total Questions</label>
+                        <input type="number" id="edit-preset-qs" class="settings-input" style="width:100%;">
+                    </div>
+                </div>
+
+                <div style="margin-bottom:15px; border:1px solid #ddd; border-radius:6px; overflow:hidden;">
+                    <div style="background:#eee; padding:8px; font-weight:bold; font-size:0.85rem; color:#333;">Navigation Physics</div>
+                    <div style="padding:10px; display:flex; gap:10px; background:#fcfcfc;">
+                        <label style="flex:1; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:5px;">
+                            <input type="radio" name="edit-preset-lock" value="false"> 🔓 Open (Tier-I)
+                        </label>
+                        <label style="flex:1; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:5px;">
+                            <input type="radio" name="edit-preset-lock" value="true"> 🔒 Locked (Sectional)
+                        </label>
+                    </div>
+                </div>
+
+                <div id="bucket-config-area" style="margin-bottom:10px;">
+                    <label style="font-weight:bold; font-size:0.85rem; color:var(--cbt-blue);">Session Breaks (Buckets)</label>
+                    <div style="font-size:0.75rem; color:#888; margin-bottom:8px;">How many subjects go into each session before a break? (Comma separated, e.g., 2,2,1). Leave blank for NO breaks.</div>
+                    <input type="text" id="edit-preset-buckets" class="settings-input" style="text-align:left; width:100%;" placeholder="e.g., 2,2,1">
+                </div>
+            </div>
+            <div class="settings-footer" style="justify-content: space-between;">
+                <button id="btn-delete-preset" class="btn btn-outline" style="border-color:var(--cbt-red); color:var(--cbt-red);" onclick="deleteActivePreset()">🗑️ Delete</button>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-outline" onclick="closePresetEditor()">Cancel</button>
+                    <button class="btn" style="background:var(--cbt-purple); color:white;" onclick="savePresetData()">💾 Save Exam</button>
+                </div>
             </div>
         </div>
     </div>
@@ -804,6 +857,12 @@
         let userMockGlobalTime = parseInt(localStorage.getItem('vu_mock_global_time')) || 60;
         let userMockGlobalQs = parseInt(localStorage.getItem('vu_mock_global_qs')) || 100;
         let userMockSplitMode = localStorage.getItem('vu_mock_split_mode') || 'auto';
+        // --- PHASE 1: PRESET ARCHITECT MEMORY ---
+        let examPresets = JSON.parse(localStorage.getItem('vu_exam_presets')) || [
+            { id: 'custom', name: 'Custom Exam', time: 60, qs: 100, locked: false, buckets: [] },
+            { id: 'ssc-t2', name: 'SSC Tier-II', time: 135, qs: 150, locked: true, buckets: [2, 2, 1] }
+        ];
+        let activePresetId = localStorage.getItem('vu_active_preset') || 'custom';
         let userMockPreset = localStorage.getItem('vu_mock_preset') || 'custom';
         let userMockSecData = JSON.parse(localStorage.getItem('vu_mock_sec_data') || '{}');
         let userPracticeQs = parseInt(localStorage.getItem('vu_practice_qs')) || 50;
