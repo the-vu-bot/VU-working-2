@@ -2494,14 +2494,13 @@
             }
         }
 
-        // --- PHASE 4: THE VU JOURNEY VAULT SYNC (DYNAMIC COLUMNS) ---
+        // --- PHASE 4: THE VU JOURNEY VAULT SYNC (FINAL LABELS & CASE FIX) ---
         function pushToJourneyVault() {
             if (!JOURNEY_API_URL || JOURNEY_API_URL === "YOUR_WEB_APP_URL_HERE") return;
             
             let correct = 0, attempted = 0, wrongTotal = 0;
             let subStats = {};
 
-            // Calculate overall AND subject-specific stats dynamically
             state.forEach((s, i) => {
                 const sub = questions[i].subject || 'General';
                 if(!subStats[sub]) subStats[sub] = { total: 0, att: 0, correct: 0, wrong: 0, time: 0 };
@@ -2518,8 +2517,8 @@
 
             let finalScore = (correct - (wrongTotal / 3)).toFixed(2);
             let acc = attempted > 0 ? Math.round((correct/attempted)*100) : 0;
-            
-            // --- FIXED EXAM LABEL LOGIC ---
+
+            // --- CORRECTED LABEL LOGIC ---
             let examLabel = "";
             const subName = questions[0]?.subject || 'Mixed';
             
@@ -2532,7 +2531,6 @@
             } else {
                 examLabel = `Sprint: ${subName}`;
             }
-            // ------------------------------
 
             let payloadObj = {
                 uids: questions.map(q => q.uid),
@@ -2541,7 +2539,7 @@
                 timeSpentGlobal: timeSpentGlobal
             };
 
-            // BASE COLUMNS
+            // STRICT UPPERCASE KEYS to match Columns A-F and prevent duplicates
             let postData = {
                 Timestamp: new Date().toISOString(),
                 ExamType: examLabel,
@@ -2551,13 +2549,12 @@
                 Payload: JSON.stringify(payloadObj)
             };
 
-            // DYNAMIC SUBJECT COLUMNS (Appends directly to your Google Sheet!)
+            // DYNAMIC SUBJECT COLUMNS
             for(const [sub, data] of Object.entries(subStats)) {
                 if (data.total === 0) continue; 
                 let subScore = (data.correct - (data.wrong / 3)).toFixed(2);
                 let subAcc = data.att > 0 ? Math.round((data.correct/data.att)*100) : 0;
                 
-                // Format: "Math_Score", "Math_Acc", etc.
                 postData[`${sub}_Score`] = subScore;
                 postData[`${sub}_Acc`] = subAcc;
                 postData[`${sub}_Att`] = data.att;
@@ -2569,7 +2566,7 @@
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(postData)
-            }).then(() => console.log("✅ Journey Recorded with Dynamic Stats!"))
+            }).then(() => console.log("✅ Journey Recorded with Correct Labels!"))
               .catch(e => console.error("❌ Journey log failed", e));
         }
 
