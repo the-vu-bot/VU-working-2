@@ -1854,6 +1854,8 @@
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'palette-section-title';
                 let lockStatus = '';
+                
+                // 1. SESSION-AWARE VISUAL LOCKS
                 if(examType === 'mock' && currentMode === 'test') {
                     let activeSessionId = mockBoundaries[activeSectionIndex].sessionId;
                     let thisSessionId = sec.sessionId;
@@ -1872,18 +1874,17 @@
                 for(let i = sec.start; i <= sec.end; i++) {
                     const btn = document.createElement('button');
                     btn.className = 'pal-btn'; btn.id = `pal-${i}`; btn.innerText = i + 1;
+                    
+                    // 2. SESSION-AWARE CLICK LOGIC
                     btn.onclick = () => {
                         let activeSessionId = mockBoundaries[activeSectionIndex].sessionId;
                         let targetSessionId = mockBoundaries[bIndex].sessionId;
 
-                        // Allow clicking if in 'open' mode OR if the target subject belongs to the active session
                         if (examType === 'mock' && currentMode === 'test' && mockPhysicsMode !== 'open' && targetSessionId !== activeSessionId) return;
                         
-                        // Keep Review Mode protection
-                        if (currentMode === 'review' && reviewFilteredIndices.length > 0 && !reviewFilteredIndices.includes(i)) return; 
+                        if (currentMode === 'review' && reviewFilteredIndices.length > 0 && !reviewFilteredIndices.includes(i)) return; // Phase 3 protection
                         
-                        // Update activeSectionIndex to the clicked subject so boundaries match
-                        activeSectionIndex = bIndex; 
+                        activeSectionIndex = bIndex; // Safely switch the active subject
                         loadQuestion(i);
                     };
                     gridDiv.appendChild(btn);
