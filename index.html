@@ -413,10 +413,15 @@
 
                     <div class="settings-section">
                         <div class="settings-section-title" style="color: #d9534f;">🏆 Full Mock Configuration</div>
-                        <div id="dynamic-preset-chips" style="display:flex; gap:8px; margin-bottom:12px; overflow-x:auto; padding-bottom:5px; align-items:center;"></div>
-                            <button id="preset-custom" class="btn btn-outline preset-chip" style="border-radius:20px; font-size:0.8rem; padding:4px 12px; border-color:var(--cbt-blue); background:var(--cbt-blue); color:white;" onclick="applyMockPreset('custom')">Custom</button>
-                            <button id="preset-ssc-tier2" class="btn btn-outline preset-chip" style="border-radius:20px; font-size:0.8rem; padding:4px 12px;" onclick="applyMockPreset('ssc-tier2')">SSC Tier-II</button>
+                        
+                        <div id="mock-status-label" style="font-size:0.75rem; font-weight:bold; color:var(--cbt-purple); margin-bottom:8px; display:flex; align-items:center; gap:5px;">
+                            🕒 Navigation: Loading...
                         </div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; overflow-x:auto; padding-bottom:5px;">
+                            <div id="dynamic-preset-chips" style="display:flex; gap:8px; align-items:center;"></div>
+                            <button class="btn btn-outline" style="border-radius:20px; font-size:0.8rem; padding:4px 10px; border-color:var(--cbt-green); color:var(--cbt-green); white-space:nowrap;" onclick="openPresetEditor(null)">➕ Add Exam</button>
+                        </div>
+
                         <div class="settings-row" style="background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
                             <div style="flex:1;"><strong style="color:#333;">Global Mock Limits</strong><div style="font-size:0.75rem; color:#888;">Total Stopwatch & Qs.</div></div>
                             <div class="aligned-input-grid">
