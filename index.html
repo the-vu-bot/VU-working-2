@@ -1694,25 +1694,23 @@
                     document.getElementById('sec-timer').innerText = formatTime(sectionalSeconds);
                     
                     if (sectionalSeconds <= 0) {
-                        let currentBoundary = mockBoundaries[activeSectionIndex];
-                        let triggerBreak = false;
+                        let currentSessionId = mockBoundaries[activeSectionIndex].sessionId;
+                        let lastSubjectInSession = mockBoundaries.filter(b => b.sessionId === currentSessionId).pop();
+                        let triggerBreak = lastSubjectInSession ? lastSubjectInSession.isSessionEnd : false;
                         
-                        // Only trigger visual breaks for session modes
-                        if ((mockPhysicsMode === 'session-pool' || mockPhysicsMode === 'session-strict') && currentBoundary.isSessionEnd) {
-                            triggerBreak = true;
-                        }
+                        // Find the first subject of the NEXT session
+                        let nextSessionIdx = mockBoundaries.findIndex((b, i) => i > activeSectionIndex && b.sessionId !== currentSessionId);
                         
-                        activeSectionIndex++;
-                        if (activeSectionIndex < mockBoundaries.length) {
+                        if (nextSessionIdx !== -1) {
+                            activeSectionIndex = nextSessionIdx;
                             sectionalSeconds = mockBoundaries[activeSectionIndex].allocatedTime; 
-                            loadQuestion(mockBoundaries[activeSectionIndex].start); buildPalette();
+                            loadQuestion(mockBoundaries[activeSectionIndex].start); 
+                            buildPalette();
                             
-                            // 🛑 DYNAMIC SESSION BREAK
-                            if (triggerBreak) {
+                            if ((mockPhysicsMode === 'session-pool' || mockPhysicsMode === 'session-strict') && triggerBreak) {
                                 let nextSubName = mockBoundaries[activeSectionIndex].name;
-                                triggerSessionBreak("Session Completed 🛑", `Take a breath. Click below to start Session: ${nextSubName}.`);
+                                triggerSessionBreak("Session Completed 🛑", `Take a breath. Click below to start next session.`);
                             }
-                            
                         } else { submitExam(); }
                     }
                 } else if (examType === 'sprint' && currentMode === 'test') {
@@ -1744,18 +1742,15 @@
             questions = []; mockBoundaries = []; timeSpentGlobal = 0; isPaused = false; 
             
             if (type === 'mock') {
-                // --- 4-TIER BUCKET LOGIC SETUP ---
+                // --- UPGRADED 4-TIER BUCKET LOGIC ---
                 let preset = examPresets.find(p => p.id === activePresetId);
                 let bucketArray = [];
                 if (preset && preset.buckets && preset.buckets.trim() !== '') {
                     bucketArray = preset.buckets.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n) && n > 0);
                 }
 
-                let currentBucketIndex = 0;
-                let itemsInCurrentBucket = 0;
-                let poolTimeAccumulator = 0;
-                let poolStartIndex = questions.length;
-                let poolNames = [];
+                let currentSessionId = 0;
+                let itemsInCurrentSession = 0;
 
                 globalActiveSubjects.forEach((secName, index) => {
                     let limitQs = userMockSecData[secName] ? userMockSecData[secName].qs : 25;
@@ -1769,54 +1764,46 @@
                         questions = questions.concat(secQs);
                         let endIndex = questions.length - 1;
                         
-                        itemsInCurrentBucket++;
-                        let isBreak = false;
+                        itemsInCurrentSession++;
+                        let isSessionEnd = false;
                         let isLastSubject = index === globalActiveSubjects.length - 1;
 
-                        if (bucketArray.length > 0 && currentBucketIndex < bucketArray.length) {
-                            if (itemsInCurrentBucket >= bucketArray[currentBucketIndex] || isLastSubject) {
-                                isBreak = true;
+                        if (bucketArray.length > 0 && currentSessionId < bucketArray.length) {
+                            if (itemsInCurrentSession >= bucketArray[currentSessionId] || isLastSubject) {
+                                isSessionEnd = true;
                             }
                         } else if (isLastSubject) {
-                            isBreak = true; // Always mark the end of the test
+                            isSessionEnd = true;
                         }
 
-                        // THE PHYSICS SPLITTER
-                        if (mockPhysicsMode === 'session-pool') {
-                            poolTimeAccumulator += (limitTime * 60);
-                            poolNames.push(secName);
+                        // Always push as individual subject boundaries
+                        mockBoundaries.push({ 
+                            name: secName, 
+                            start: startIndex, 
+                            end: endIndex, 
+                            allocatedTime: limitTime * 60, // Raw time initially
+                            sessionId: currentSessionId,
+                            isSessionEnd: isSessionEnd
+                        });
 
-                            if (isBreak) {
-                                mockBoundaries.push({
-                                    name: poolNames.join(' + '),
-                                    start: poolStartIndex,
-                                    end: endIndex,
-                                    allocatedTime: poolTimeAccumulator,
-                                    isSessionEnd: true
-                                });
-                                // Reset for the next bucket
-                                poolTimeAccumulator = 0;
-                                poolNames = [];
-                                poolStartIndex = questions.length;
-                                currentBucketIndex++;
-                                itemsInCurrentBucket = 0;
-                            }
-                        } else {
-                            // Subject Strict or Session Strict or Open
-                            mockBoundaries.push({ 
-                                name: secName, 
-                                start: startIndex, 
-                                end: endIndex, 
-                                allocatedTime: limitTime * 60, 
-                                isSessionEnd: (mockPhysicsMode === 'session-strict') ? isBreak : false 
-                            });
-                            if (isBreak) {
-                                currentBucketIndex++;
-                                itemsInCurrentBucket = 0;
-                            }
+                        if (isSessionEnd) {
+                            currentSessionId++;
+                            itemsInCurrentSession = 0;
                         }
                     }
                 });
+
+                // POST-PROCESS: Pool times for 'session-pool' mode
+                if (mockPhysicsMode === 'session-pool') {
+                    let sessionTimeTotals = {};
+                    mockBoundaries.forEach(b => {
+                        if (!sessionTimeTotals[b.sessionId]) sessionTimeTotals[b.sessionId] = 0;
+                        sessionTimeTotals[b.sessionId] += b.allocatedTime;
+                    });
+                    mockBoundaries.forEach(b => {
+                        b.allocatedTime = sessionTimeTotals[b.sessionId];
+                    });
+                }
                 if(questions.length === 0) { alert("Add questions to JSON first or select active subjects!"); return; }
                 activeSectionIndex = 0;
                 sectionalSeconds = mockBoundaries.length > 0 ? mockBoundaries[0].allocatedTime : 0; 
@@ -1868,8 +1855,11 @@
                 titleDiv.className = 'palette-section-title';
                 let lockStatus = '';
                 if(examType === 'mock' && currentMode === 'test') {
-                    if (bIndex < activeSectionIndex) lockStatus = ' <span style="color:#888;">(Done)</span>';
-                    else if (bIndex > activeSectionIndex) lockStatus = ' <span style="color:#d9534f;">(Locked)</span>';
+                    let activeSessionId = mockBoundaries[activeSectionIndex].sessionId;
+                    let thisSessionId = sec.sessionId;
+
+                    if (thisSessionId < activeSessionId) lockStatus = ' <span style="color:#888;">(Done)</span>';
+                    else if (thisSessionId > activeSessionId) lockStatus = ' <span style="color:#d9534f;">(Locked)</span>';
                     else lockStatus = ' <span style="color:var(--cbt-green);">(Active)</span>';
                 }
                 titleDiv.innerHTML = `<span>${sec.name.toUpperCase()}</span> ${lockStatus}`;
@@ -1883,8 +1873,17 @@
                     const btn = document.createElement('button');
                     btn.className = 'pal-btn'; btn.id = `pal-${i}`; btn.innerText = i + 1;
                     btn.onclick = () => {
-                        if (examType === 'mock' && currentMode === 'test' && mockPhysicsMode !== 'open' && bIndex !== activeSectionIndex) return;
-                        if (currentMode === 'review' && reviewFilteredIndices.length > 0 && !reviewFilteredIndices.includes(i)) return; // Phase 3 protection
+                        let activeSessionId = mockBoundaries[activeSectionIndex].sessionId;
+                        let targetSessionId = mockBoundaries[bIndex].sessionId;
+
+                        // Allow clicking if in 'open' mode OR if the target subject belongs to the active session
+                        if (examType === 'mock' && currentMode === 'test' && mockPhysicsMode !== 'open' && targetSessionId !== activeSessionId) return;
+                        
+                        // Keep Review Mode protection
+                        if (currentMode === 'review' && reviewFilteredIndices.length > 0 && !reviewFilteredIndices.includes(i)) return; 
+                        
+                        // Update activeSectionIndex to the clicked subject so boundaries match
+                        activeSectionIndex = bIndex; 
                         loadQuestion(i);
                     };
                     gridDiv.appendChild(btn);
