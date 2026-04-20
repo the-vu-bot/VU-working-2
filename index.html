@@ -1261,6 +1261,12 @@
                 } else {
                     document.getElementById('review-filter-bar').style.display = 'none';
                     document.getElementById('mobile-submit-btn').classList.remove('hide-for-review');
+                    
+                    // --- UI FIX: Restore active test action bars ---
+                    document.getElementById('action-bar-test').style.display = 'flex';
+                    document.getElementById('action-bar-review').style.display = 'none';
+                    // -----------------------------------------------
+
                     loadQuestion(currentQ); pauseTest(); 
                 }
                 return true;
@@ -1350,6 +1356,12 @@
             localStorage.removeItem(STORAGE_SESSION); 
             document.getElementById('mobile-submit-btn').classList.remove('hide-for-review');
             document.getElementById('review-filter-bar').style.display = 'none'; // Hide filters
+            
+            // --- UI FIX: Force action bars back to Test Mode ---
+            document.getElementById('action-bar-test').style.display = 'flex';
+            document.getElementById('action-bar-review').style.display = 'none';
+            // ---------------------------------------------------
+
             defaultLang = document.getElementById('default-lang-select').value;
             currentLang = defaultLang;
             document.getElementById('lang-select').value = currentLang;
@@ -2589,6 +2601,13 @@
                 document.getElementById('review-filter-bar').style.display = 'flex';
             } else if (mode === 'test' || mode === 'practice') {
                 document.getElementById('cbt-screen').style.display = 'flex'; // Fallback
+                
+                // --- UI FIX: Hardware Back button resets action bars ---
+                document.getElementById('action-bar-test').style.display = 'flex';
+                document.getElementById('action-bar-review').style.display = 'none';
+                document.getElementById('review-filter-bar').style.display = 'none';
+                document.getElementById('mobile-submit-btn').classList.remove('hide-for-review');
+                // -------------------------------------------------------
             }
         }
 
