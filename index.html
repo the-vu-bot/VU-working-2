@@ -1682,20 +1682,18 @@
                     document.getElementById('sec-timer').innerText = formatTime(sectionalSeconds);
                     
                     if (sectionalSeconds <= 0) {
-                        let finishedSectionName = mockBoundaries[activeSectionIndex].name;
+                        let currentBoundary = mockBoundaries[activeSectionIndex];
+                        let triggerBreak = currentBoundary.isSessionEnd;
                         
                         activeSectionIndex++;
                         if (activeSectionIndex < mockBoundaries.length) {
                             sectionalSeconds = mockBoundaries[activeSectionIndex].allocatedTime; 
                             loadQuestion(mockBoundaries[activeSectionIndex].start); buildPalette();
                             
-                            // Check for SSC Tier-II Session Breaks
-                            if (userMockPreset === 'ssc-tier2') {
-                                if (finishedSectionName === 'Reasoning') {
-                                    triggerSessionBreak("Session-I Completed 🛑", "Maths & Reasoning finished. Take a breath, then start Session-II (English & GS).");
-                                } else if (finishedSectionName === 'GS') {
-                                    triggerSessionBreak("Session-II Completed 🛑", "English & GS finished. Click below to start Section-III (Computer Knowledge).");
-                                }
+                            // 🛑 DYNAMIC SESSION BREAK
+                            if (isMockLocked && triggerBreak) {
+                                let nextSubName = mockBoundaries[activeSectionIndex].name;
+                                triggerSessionBreak("Session Completed 🛑", `Take a breath. Click the button below when you are ready to start ${nextSubName}.`);
                             }
                             
                         } else { submitExam(); }
@@ -1729,16 +1727,38 @@
             questions = []; mockBoundaries = []; timeSpentGlobal = 0; isPaused = false; 
             
             if (type === 'mock') {
+                // --- BUCKET LOGIC SETUP ---
+                let preset = examPresets.find(p => p.id === activePresetId);
+                let bucketArray = [];
+                if (preset && preset.buckets && preset.buckets.trim() !== '') {
+                    bucketArray = preset.buckets.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n) && n > 0);
+                }
+                let currentBucketIndex = 0;
+                let itemsInCurrentBucket = 0;
+
                 globalActiveSubjects.forEach(secName => {
                     let limitQs = userMockSecData[secName] ? userMockSecData[secName].qs : 25;
                     let limitTime = userMockSecData[secName] ? userMockSecData[secName].time : 15;
                     let secQs = masterBank.filter(q => q.subject === secName);
                     secQs = getSmartSelection(secQs, limitQs);
                     secQs = shuffleOptionsForQuestions(secQs);
+                    
                     if(secQs.length > 0) {
                         let startIndex = questions.length;
                         questions = questions.concat(secQs);
-                        mockBoundaries.push({ name: secName, start: startIndex, end: questions.length - 1, allocatedTime: limitTime * 60 });
+                        
+                        // Check if this subject completes a bucket
+                        let isBreak = false;
+                        if (bucketArray.length > 0 && currentBucketIndex < bucketArray.length) {
+                            itemsInCurrentBucket++;
+                            if (itemsInCurrentBucket >= bucketArray[currentBucketIndex]) {
+                                isBreak = true;
+                                currentBucketIndex++;
+                                itemsInCurrentBucket = 0;
+                            }
+                        }
+                        
+                        mockBoundaries.push({ name: secName, start: startIndex, end: questions.length - 1, allocatedTime: limitTime * 60, isSessionEnd: isBreak });
                     }
                 });
                 if(questions.length === 0) { alert("Add questions to JSON first or select active subjects!"); return; }
