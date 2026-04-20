@@ -406,6 +406,10 @@
 
                     <div class="settings-section">
                         <div class="settings-section-title" style="color: #d9534f;">🏆 Full Mock Configuration</div>
+                        <div style="display:flex; gap:8px; margin-bottom:12px; overflow-x:auto; padding-bottom:5px;">
+                            <button id="preset-custom" class="btn btn-outline preset-chip" style="border-radius:20px; font-size:0.8rem; padding:4px 12px; border-color:var(--cbt-blue); background:var(--cbt-blue); color:white;" onclick="applyMockPreset('custom')">Custom</button>
+                            <button id="preset-ssc-tier2" class="btn btn-outline preset-chip" style="border-radius:20px; font-size:0.8rem; padding:4px 12px;" onclick="applyMockPreset('ssc-tier2')">SSC Tier-II</button>
+                        </div>
                         <div class="settings-row" style="background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
                             <div style="flex:1;"><strong style="color:#333;">Global Mock Limits</strong><div style="font-size:0.75rem; color:#888;">Total Stopwatch & Qs.</div></div>
                             <div class="aligned-input-grid">
@@ -793,6 +797,7 @@
         let userMockGlobalTime = parseInt(localStorage.getItem('vu_mock_global_time')) || 60;
         let userMockGlobalQs = parseInt(localStorage.getItem('vu_mock_global_qs')) || 100;
         let userMockSplitMode = localStorage.getItem('vu_mock_split_mode') || 'auto';
+        let userMockPreset = localStorage.getItem('vu_mock_preset') || 'custom';
         let userMockSecData = JSON.parse(localStorage.getItem('vu_mock_sec_data') || '{}');
         let userPracticeQs = parseInt(localStorage.getItem('vu_practice_qs')) || 50;
         let userCalcQs = parseInt(localStorage.getItem('vu_calc_qs')) || 50;
@@ -827,6 +832,9 @@
             document.getElementById('set-mock-global-qs').value = userMockGlobalQs;
             document.getElementById('set-practice-qs').value = userPracticeQs;
             document.getElementById('set-calc-qs').value = userCalcQs;
+            document.querySelectorAll('.preset-chip').forEach(c => { c.style.background='white'; c.style.color='#333'; c.style.borderColor='#ccc'; });
+            let activeChip = document.getElementById('preset-' + userMockPreset);
+            if(activeChip) { activeChip.style.background='var(--cbt-blue)'; activeChip.style.color='white'; activeChip.style.borderColor='var(--cbt-blue)'; }
             
             // Populate Tests Tab Subjects
             const modalContainer = document.getElementById('modal-subject-toggles');
@@ -950,6 +958,51 @@
             }
         }
 
+        function applyMockPreset(preset) {
+            userMockPreset = preset;
+            
+            // 1. Visually update the chips
+            document.querySelectorAll('.preset-chip').forEach(c => { c.style.background='white'; c.style.color='#333'; c.style.borderColor='#ccc'; });
+            let activeChip = document.getElementById('preset-' + preset);
+            if(activeChip) { activeChip.style.background='var(--cbt-blue)'; activeChip.style.color='white'; activeChip.style.borderColor='var(--cbt-blue)'; }
+            
+            // 2. Apply SSC Tier-II Pattern
+            if(preset === 'ssc-tier2') {
+                // Ensure required subjects are active (Matches official pattern)
+                let requiredSubs = ['Maths', 'Reasoning', 'English', 'GS', 'Computer'];
+                let allBanks = [...new Set(masterBank.map(q => q.subject).filter(Boolean))];
+                
+                requiredSubs.forEach(sub => {
+                    if (allBanks.includes(sub) && !globalActiveSubjects.includes(sub)) {
+                        globalActiveSubjects.push(sub);
+                    }
+                });
+                localStorage.setItem('vu_global_subjects', JSON.stringify(globalActiveSubjects));
+                
+                // Visually update Subject Toggles
+                document.querySelectorAll('#modal-subject-toggles .sub-toggle-btn').forEach(btn => {
+                    if(globalActiveSubjects.includes(btn.innerText)) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                });
+
+                // Set Global Limits (135 Mins / 150 Qs)
+                document.getElementById('set-mock-global-time').value = 135; 
+                document.getElementById('set-mock-global-qs').value = 150;
+                
+                // Force Custom Split Mode
+                setSplitMode('custom');
+                
+                // Pre-fill the specific Sectional Data
+                userMockSecData['Maths'] = { time: 30, qs: 30 };
+                userMockSecData['Reasoning'] = { time: 30, qs: 30 };
+                userMockSecData['English'] = { time: 35, qs: 45 };
+                userMockSecData['GS'] = { time: 25, qs: 25 };
+                userMockSecData['Computer'] = { time: 15, qs: 20 };
+                
+                renderSectionalDistribution();
+            }
+        }
+
         function syncFromGlobal() {
             if(userMockSplitMode === 'auto' && globalActiveSubjects.length > 0) {
                 let totalTime = parseInt(document.getElementById('set-mock-global-time').value) || 0;
@@ -1026,6 +1079,7 @@
             userCalcQs = parseInt(document.getElementById('set-calc-qs').value) || 50;
             localStorage.setItem('vu_practice_qs', userPracticeQs);
             localStorage.setItem('vu_calc_qs', userCalcQs);
+            localStorage.setItem('vu_mock_preset', userMockPreset);
             updateDashboardDropdowns();
             closeSettings();
         }
