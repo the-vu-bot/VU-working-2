@@ -2282,27 +2282,54 @@
         function renderAnalyticsDisplay() {
             document.getElementById('header-timer-area').style.display = 'none';
             let correct = 0, attempted = 0, wrongTotal = 0;
+            
+            // Stats holders
             let subStats = {};
+            let sessionStats = {};
 
-            mockBoundaries.forEach(b => { subStats[b.name] = { total: 0, att: 0, correct: 0, wrong: 0, time: 0 }; });
+            // Initialize holders based on boundaries
+            mockBoundaries.forEach(b => { 
+                subStats[b.name] = { total: 0, att: 0, correct: 0, wrong: 0, time: 0 }; 
+                if (b.sessionId !== undefined) {
+                    if (!sessionStats[b.sessionId]) {
+                        sessionStats[b.sessionId] = { name: `Session ${b.sessionId + 1}`, total: 0, att: 0, correct: 0, wrong: 0, time: 0, subjects: [] };
+                    }
+                    if (!sessionStats[b.sessionId].subjects.includes(b.name)) sessionStats[b.sessionId].subjects.push(b.name);
+                }
+            });
 
             state.forEach((s, i) => {
-                const sub = questions[i].subject || 'General';
+                const q = questions[i];
+                const sub = q.subject || 'General';
+                const b = mockBoundaries.find(mb => i >= mb.start && i <= mb.end);
+                
                 if(!subStats[sub]) subStats[sub] = { total: 0, att: 0, correct: 0, wrong: 0, time: 0 };
                 
-                subStats[sub].total++; subStats[sub].time += s.timeTaken;
+                subStats[sub].total++; 
+                subStats[sub].time += s.timeTaken;
+
+                if (b && b.sessionId !== undefined) {
+                    sessionStats[b.sessionId].total++;
+                    sessionStats[b.sessionId].time += s.timeTaken;
+                }
                 
                 if(s.selected !== null) {
                     attempted++; subStats[sub].att++;
-                    if(s.selected === questions[i].correct) { correct++; subStats[sub].correct++; } 
-                    else { wrongTotal++; subStats[sub].wrong++; }
+                    if (b && b.sessionId !== undefined) sessionStats[b.sessionId].att++;
+
+                    if(s.selected === q.correct) { 
+                        correct++; subStats[sub].correct++; 
+                        if (b && b.sessionId !== undefined) sessionStats[b.sessionId].correct++;
+                    } 
+                    else { 
+                        wrongTotal++; subStats[sub].wrong++; 
+                        if (b && b.sessionId !== undefined) sessionStats[b.sessionId].wrong++;
+                    }
                 }
             });
 
             let finalScore = (correct - (wrongTotal / 3)).toFixed(2);
             let acc = attempted > 0 ? Math.round((correct/attempted)*100) : 0;
-            
-            // NEW: Calculate overall unattempted
             let unattemptedOverall = questions.length - attempted; 
 
             document.getElementById('dash-score').innerText = `${finalScore}`;
@@ -2314,21 +2341,36 @@
 
             let cardsHtml = '';
             let now = new Date();
-            
-            // Helper function to add leading zeros for alignment
             const pad = (num) => num.toString().padStart(2, '0');
 
-            // Building the new formatted Insight Text
+            // 1. Generate Session Groupings (if using sessions)
+            if (Object.keys(sessionStats).length > 1) {
+                cardsHtml += `<div style="font-weight:bold; color:var(--cbt-purple); margin: 20px 0 10px 0; border-bottom: 2px solid var(--cbt-purple); padding-bottom:5px;">📋 Session-wise Summary</div>`;
+                for (const [sid, data] of Object.entries(sessionStats)) {
+                    let sAcc = data.att > 0 ? Math.round((data.correct/data.att)*100) : 0;
+                    let sScore = (data.correct - (data.wrong / 3)).toFixed(2);
+                    cardsHtml += `
+                        <div class="sub-card" style="border-left: 5px solid var(--cbt-purple); background: #fdfaff;">
+                            <div class="sub-name" style="width:150px; color:var(--cbt-purple);">${data.name}<div style="font-size:0.7rem; color:#888;">${data.subjects.join(' + ')}</div></div>
+                            <div class="sub-metrics">
+                                <div class="metric">Score<span>${sScore}</span></div>
+                                <div class="metric">Acc<span>${sAcc}%</span></div>
+                                <div class="metric">Att<span>${data.att}/${data.total}</span></div>
+                                <div class="metric">Time<span>${formatTime(data.time)}</span></div>
+                            </div>
+                        </div>`;
+                }
+            }
+
+            cardsHtml += `<div style="font-weight:bold; color:var(--cbt-blue); margin: 20px 0 10px 0; border-bottom: 2px solid var(--cbt-blue); padding-bottom:5px;">📚 Subject Breakdown</div>`;
+            
             let textLog = `VU POWER POSTMORTEM | ${now.toLocaleDateString('en-IN')} ${now.toLocaleTimeString('en-IN')}\n`;
             textLog += `Mode: ${examType.toUpperCase()}\n`;
-            textLog += `Score: ${finalScore}/${questions.length} | Acc: ${acc}% | Time: ${formatTime(timeSpentGlobal)}\n`;
-            textLog += `Overall: Att: ${attempted}/${questions.length} | Right: ${correct} | Wrong: ${wrongTotal} | unatt: ${pad(unattemptedOverall)}\n-------------------------------------------------\n`;
+            textLog += `Score: ${finalScore}/${questions.length} | Acc: ${acc}% | Time: ${formatTime(timeSpentGlobal)}\n-------------------------------------------------\n`;
 
             for(const [sub, data] of Object.entries(subStats)) {
                 if (data.total === 0) continue; 
                 let subAcc = data.att > 0 ? Math.round((data.correct/data.att)*100) : 0;
-                
-                // NEW: Calculate subject unattempted
                 let subUnatt = data.total - data.att; 
                 
                 cardsHtml += `
@@ -2337,18 +2379,17 @@
                         <div class="sub-metrics">
                             <div class="metric">Acc<span>${subAcc}%</span></div>
                             <div class="metric">Att<span>${data.att}/${data.total}</span></div>
-                            <div class="metric" style="color:var(--cbt-green);">Right<span>${data.correct}</span></div>
-                            <div class="metric" style="color:var(--cbt-red);">Wrong<span>${data.wrong}</span></div>
+                            <div class="metric" style="color:var(--cbt-green);">R<span>${data.correct}</span></div>
+                            <div class="metric" style="color:var(--cbt-red);">W<span>${data.wrong}</span></div>
                             <div class="metric">Time<span>${formatTime(data.time)}</span></div>
                         </div>
                     </div>`;
-                    
-                // Append the zero-loss tracking subject row
                 textLog += `[${sub.toUpperCase()}] Acc: ${subAcc}% | Att: ${pad(data.att)}/${pad(data.total)} | R: ${pad(data.correct)} | W: ${pad(data.wrong)} | uatt: ${pad(subUnatt)} | Time: ${formatTime(data.time)}\n`;
             }
             
             document.getElementById('detailed-stats-area').innerHTML = cardsHtml;
             document.getElementById('insight-text').value = textLog;
+        }
         }
 
         function showDashboard() {
