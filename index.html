@@ -1695,7 +1695,12 @@
                     
                     if (sectionalSeconds <= 0) {
                         let currentBoundary = mockBoundaries[activeSectionIndex];
-                        let triggerBreak = currentBoundary.isSessionEnd;
+                        let triggerBreak = false;
+                        
+                        // Only trigger visual breaks for session modes
+                        if ((mockPhysicsMode === 'session-pool' || mockPhysicsMode === 'session-strict') && currentBoundary.isSessionEnd) {
+                            triggerBreak = true;
+                        }
                         
                         activeSectionIndex++;
                         if (activeSectionIndex < mockBoundaries.length) {
@@ -1703,9 +1708,9 @@
                             loadQuestion(mockBoundaries[activeSectionIndex].start); buildPalette();
                             
                             // 🛑 DYNAMIC SESSION BREAK
-                            if (isMockLocked && triggerBreak) {
+                            if (triggerBreak) {
                                 let nextSubName = mockBoundaries[activeSectionIndex].name;
-                                triggerSessionBreak("Session Completed 🛑", `Take a breath. Click the button below when you are ready to start ${nextSubName}.`);
+                                triggerSessionBreak("Session Completed 🛑", `Take a breath. Click below to start Session: ${nextSubName}.`);
                             }
                             
                         } else { submitExam(); }
@@ -1739,16 +1744,20 @@
             questions = []; mockBoundaries = []; timeSpentGlobal = 0; isPaused = false; 
             
             if (type === 'mock') {
-                // --- BUCKET LOGIC SETUP ---
+                // --- 4-TIER BUCKET LOGIC SETUP ---
                 let preset = examPresets.find(p => p.id === activePresetId);
                 let bucketArray = [];
                 if (preset && preset.buckets && preset.buckets.trim() !== '') {
                     bucketArray = preset.buckets.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n) && n > 0);
                 }
+
                 let currentBucketIndex = 0;
                 let itemsInCurrentBucket = 0;
+                let poolTimeAccumulator = 0;
+                let poolStartIndex = questions.length;
+                let poolNames = [];
 
-                globalActiveSubjects.forEach(secName => {
+                globalActiveSubjects.forEach((secName, index) => {
                     let limitQs = userMockSecData[secName] ? userMockSecData[secName].qs : 25;
                     let limitTime = userMockSecData[secName] ? userMockSecData[secName].time : 15;
                     let secQs = masterBank.filter(q => q.subject === secName);
@@ -1758,19 +1767,54 @@
                     if(secQs.length > 0) {
                         let startIndex = questions.length;
                         questions = questions.concat(secQs);
+                        let endIndex = questions.length - 1;
                         
-                        // Check if this subject completes a bucket
+                        itemsInCurrentBucket++;
                         let isBreak = false;
+                        let isLastSubject = index === globalActiveSubjects.length - 1;
+
                         if (bucketArray.length > 0 && currentBucketIndex < bucketArray.length) {
-                            itemsInCurrentBucket++;
-                            if (itemsInCurrentBucket >= bucketArray[currentBucketIndex]) {
+                            if (itemsInCurrentBucket >= bucketArray[currentBucketIndex] || isLastSubject) {
                                 isBreak = true;
+                            }
+                        } else if (isLastSubject) {
+                            isBreak = true; // Always mark the end of the test
+                        }
+
+                        // THE PHYSICS SPLITTER
+                        if (mockPhysicsMode === 'session-pool') {
+                            poolTimeAccumulator += (limitTime * 60);
+                            poolNames.push(secName);
+
+                            if (isBreak) {
+                                mockBoundaries.push({
+                                    name: poolNames.join(' + '),
+                                    start: poolStartIndex,
+                                    end: endIndex,
+                                    allocatedTime: poolTimeAccumulator,
+                                    isSessionEnd: true
+                                });
+                                // Reset for the next bucket
+                                poolTimeAccumulator = 0;
+                                poolNames = [];
+                                poolStartIndex = questions.length;
+                                currentBucketIndex++;
+                                itemsInCurrentBucket = 0;
+                            }
+                        } else {
+                            // Subject Strict or Session Strict or Open
+                            mockBoundaries.push({ 
+                                name: secName, 
+                                start: startIndex, 
+                                end: endIndex, 
+                                allocatedTime: limitTime * 60, 
+                                isSessionEnd: (mockPhysicsMode === 'session-strict') ? isBreak : false 
+                            });
+                            if (isBreak) {
                                 currentBucketIndex++;
                                 itemsInCurrentBucket = 0;
                             }
                         }
-                        
-                        mockBoundaries.push({ name: secName, start: startIndex, end: questions.length - 1, allocatedTime: limitTime * 60, isSessionEnd: isBreak });
                     }
                 });
                 if(questions.length === 0) { alert("Add questions to JSON first or select active subjects!"); return; }
@@ -1839,7 +1883,7 @@
                     const btn = document.createElement('button');
                     btn.className = 'pal-btn'; btn.id = `pal-${i}`; btn.innerText = i + 1;
                     btn.onclick = () => {
-                        if (examType === 'mock' && currentMode === 'test' && bIndex !== activeSectionIndex) return; 
+                        if (examType === 'mock' && currentMode === 'test' && mockPhysicsMode !== 'open' && bIndex !== activeSectionIndex) return;
                         if (currentMode === 'review' && reviewFilteredIndices.length > 0 && !reviewFilteredIndices.includes(i)) return; // Phase 3 protection
                         loadQuestion(i);
                     };
@@ -1861,11 +1905,10 @@
             }).catch(err => {});
         }
 
-        function loadQuestion(index) {
-            if (examType === 'mock' && currentMode === 'test') {
-                let currentBounds = mockBoundaries[activeSectionIndex];
-                if (index < currentBounds.start || index > currentBounds.end) return; 
-            }
+        if (examType === 'mock' && currentMode === 'test' && mockPhysicsMode !== 'open') {
+        let currentBounds = mockBoundaries[activeSectionIndex];
+        if (index < currentBounds.start || index > currentBounds.end) return;
+    }
             currentQ = index;
             const q = questions[currentQ];
 
