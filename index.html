@@ -3019,7 +3019,20 @@
             if (isCalcDrill) {
                 examLabel = "Calculation Drill";
             } else if (examType === 'mock') {
-                examLabel = "Full Mock";
+                // Fetch the actual name you gave the chip
+                let preset = examPresets.find(p => p.id === activePresetId);
+                let pName = preset ? preset.name : "Full Mock";
+                
+                // Map physics ID to a readable tag
+                let physicsTags = { 
+                    'open': 'Open', 
+                    'subject-strict': 'Strict', 
+                    'session-pool': 'Pool', 
+                    'session-strict': 'S-Strict' 
+                };
+                let tag = physicsTags[mockPhysicsMode] || '';
+                
+                examLabel = `${pName} (${tag})`;
             } else if (examType === 'practice') {
                 examLabel = `Practice: ${subName}`;
             } else {
