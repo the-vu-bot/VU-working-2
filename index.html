@@ -599,8 +599,7 @@
                         <div class="mode-title">☁️ Auto-Merge Cloud Sync</div>
                         <div class="mode-desc" style="margin-bottom:0;">Securely merges device data with GitHub Vault.</div>
                     </div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; flex: 1; align-items:center;">
-                        <button class="btn btn-outline" style="width: 36px; height: 36px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; border-color: var(--cbt-red); color: var(--cbt-red);" onclick="scanForOrphans()" title="Maintenance">🧹</button>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; flex: 1; align-items:center;"><button class="btn btn-outline" style="width: 40px; height: 40px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; flex: none; border-color: var(--cbt-red); color: var(--cbt-red);" onclick="scanForOrphans()" title="Maintenance">🧹</button>
                         <button id="cloud-push-btn" class="btn btn-outline" style="flex: 1 1 0%; padding: 6px 8px; white-space: nowrap; border-color: #d9a05b; color: #b87a29;" onclick="pushToCloud()">↑ Push</button>
                         <button id="cloud-pull-btn" class="btn btn-outline" style="flex: 1 1 0%; padding: 6px 8px; white-space: nowrap; border-color: #5b9bd9; color: #297ab8;" onclick="pullFromCloud()">↓ Pull</button>
                     </div>
@@ -1612,7 +1611,8 @@
                 questions, state, currentQ, totalSeconds, sectionalSeconds, 
                 activeSectionIndex, examType, defaultLang, currentLang, 
                 mockBoundaries, timeSpentGlobal, currentMode, forcedEn, isCalcDrill,
-                revFilters, revCurrentPage, revSubjectState, revTopicState, globalActiveSubjects
+                revFilters, revCurrentPage, revSubjectState, revTopicState, globalActiveSubjects,
+                activePresetId // Store this to keep analytics accurate on refresh
             };
             localStorage.setItem(STORAGE_SESSION, JSON.stringify(session));
         }
@@ -1626,70 +1626,45 @@
                 examType = s.examType; defaultLang = s.defaultLang; currentLang = s.currentLang; 
                 mockBoundaries = s.mockBoundaries; timeSpentGlobal = s.timeSpentGlobal; currentMode = s.currentMode;
                 forcedEn = s.forcedEn || false; isCalcDrill = s.isCalcDrill || false; 
+                activePresetId = s.activePresetId || 'custom';
                 if(s.globalActiveSubjects && s.globalActiveSubjects.length > 0) globalActiveSubjects = s.globalActiveSubjects;
                 
                 if (currentMode === 'home') return false; 
 
                 document.getElementById('lock-screen').style.display = 'none';
                 document.getElementById('home-screen').style.display = 'none';
-                fetchPrivateImage(`https://raw.githubusercontent.com/the-vu-bot/exam-engine-vu/main/solutions/VU-logo.jpg`, 'home-logo');
                 
+                // --- NEW PERSISTENCE JUMPS ---
+                if (currentMode === 'journey') {
+                    openJourneyPage();
+                    return true;
+                }
+
                 if (currentMode === 'revision') {
-                    let optionsHtml = `<option value="all">Active Subjects</option>`;
-                    globalActiveSubjects.forEach(sub => { optionsHtml += `<option value="${sub}">${sub}</option>`; });
-                    document.getElementById('rev-subj-filter').innerHTML = optionsHtml;
-                    
-                    document.getElementById('rev-subj-filter').value = revSubjectState;
-                    updateTopicDropdown();
-                    document.getElementById('rev-topic-filter').value = revTopicState;
-                    
-                    document.getElementById('exam-screen') && (document.getElementById('exam-screen').style.display = 'none');
-                    document.getElementById('cbt-screen').style.display = 'none';
-                    document.getElementById('analysis-screen').style.display = 'none';
-                    document.getElementById('revision-screen').style.display = 'flex';
-                    renderRevisionFeed();
-                    return true; 
+                    openRevisionPage();
+                    return true;
                 }
                 
+                if (currentMode === 'analysis') {
+                    renderAnalyticsDisplay();
+                    document.getElementById('analysis-screen').style.display = 'flex';
+                    return true;
+                }
+
+                // Default CBT Load
                 if (examType === 'mock') document.getElementById('cbt-title').innerHTML = `Full Mock <span style="font-size:0.8rem; color:#888;">(VU)</span>`;
                 else document.getElementById('cbt-title').innerHTML = `${examType === 'sprint' ? "Sprint" : "Practice"} <span style="font-size:0.8rem; color:#888;">(VU)</span>`;
 
-                if (currentMode === 'analysis') {
-                    renderAnalyticsDisplay(); showDashboard(); return true;
-                }
-
                 document.getElementById('cbt-screen').style.display = 'flex';
-                document.getElementById('default-lang-select').value = defaultLang;
                 document.getElementById('lang-select').value = currentLang;
-
-                if(examType === 'mock' && mockPhysicsMode !== 'open') {
-                    document.getElementById('sectional-timer-wrapper').style.display = 'flex';
-                } else {
-                    document.getElementById('sectional-timer-wrapper').style.display = 'none';
-                }
+                if(examType === 'mock' && mockPhysicsMode !== 'open') document.getElementById('sectional-timer-wrapper').style.display = 'flex';
                 
                 buildPalette();
-
                 if (currentMode === 'review') {
-                    document.getElementById('header-timer-area').style.display = 'none';
-                    document.getElementById('action-bar-test').style.display = 'none';
-                    document.getElementById('action-bar-review').style.display = 'flex';
-                    document.getElementById('review-filter-bar').style.display = 'flex';
-                    document.getElementById('mobile-submit-btn').classList.add('hide-for-review');
-                    setupReviewFilters(); // Re-init filters
+                    startReviewMode();
                 } else {
-                    document.getElementById('review-filter-bar').style.display = 'none';
-                    document.getElementById('mobile-submit-btn').classList.remove('hide-for-review');
-                    
-                    // --- UI FIX: Restore active test action bars ---
-                    document.getElementById('action-bar-test').style.display = 'flex';
-                    document.getElementById('action-bar-review').style.display = 'none';
-                    // -----------------------------------------------
-
                     loadQuestion(currentQ); pauseTest(); 
                 }
-                // Hide gear if we refreshed into a live test
-                document.querySelector('.floating-gear').style.display = (currentMode === 'test' || currentMode === 'practice') ? 'none' : 'flex';
                 return true;
             }
             return false;
