@@ -1883,7 +1883,7 @@
 
                 for(let i = sec.start; i <= sec.end; i++) {
                     const btn = document.createElement('button');
-                    btn.className = 'pal-btn'; btn.id = `pal-${i}`; btn.innerText = i + 1;
+                    btn.className = 'pal-btn'; btn.id = `pal-${i}`; btn.innerText = i - sec.start + 1;
                     
                     // 2. SESSION-AWARE CLICK LOGIC
                     btn.onclick = () => {
@@ -1932,7 +1932,13 @@
                 state[currentQ].status = 'not-answered';
             }
 
-            document.getElementById('q-num-display').innerText = currentQ + 1;
+            // NUMBERING UPGRADE: Header matches Palette
+            let displayNum = currentQ + 1;
+            if (examType === 'mock' && mockBoundaries.length > 0) {
+                let currentBounds = mockBoundaries.find(b => currentQ >= b.start && currentQ <= b.end);
+                if (currentBounds) displayNum = currentQ - currentBounds.start + 1;
+            }
+            document.getElementById('q-num-display').innerText = displayNum;
             
             const isEnglishSubject = q.subject && q.subject.toLowerCase() === 'english';
             if(isEnglishSubject) {
@@ -2051,25 +2057,75 @@
                 }
                 return;
             }
+            
             let targetQ = currentQ + 1;
+            
             if (examType === 'mock' && currentMode === 'test') {
-                if(targetQ > mockBoundaries[activeSectionIndex].end) { updatePaletteUI(); return; }
-            } else if (targetQ >= questions.length) { updatePaletteUI(); return; }
+                let currentBounds = mockBoundaries[activeSectionIndex];
+                
+                if(targetQ > currentBounds.end) { 
+                    // SEAMLESS BOUNDARY JUMP LOGIC
+                    if (mockPhysicsMode === 'open') {
+                        if (activeSectionIndex + 1 < mockBoundaries.length) {
+                            activeSectionIndex++;
+                            loadQuestion(mockBoundaries[activeSectionIndex].start);
+                            buildPalette();
+                        } else {
+                            submitExamManually(); // End of entirely open exam
+                        }
+                    } else if (mockPhysicsMode === 'session-pool') {
+                        let nextIdx = activeSectionIndex + 1;
+                        if (nextIdx < mockBoundaries.length && mockBoundaries[nextIdx].sessionId === currentBounds.sessionId) {
+                            activeSectionIndex = nextIdx;
+                            loadQuestion(mockBoundaries[activeSectionIndex].start);
+                            buildPalette();
+                        } else {
+                            updatePaletteUI(); // Reached end of session bucket
+                        }
+                    } else {
+                        updatePaletteUI(); // Subject strict hits a wall
+                    }
+                    return; 
+                }
+            } else if (targetQ >= questions.length) { 
+                updatePaletteUI(); return; 
+            }
+            
             loadQuestion(targetQ); 
         }
 
         function loadPrevious() { 
             if (currentMode === 'review' && reviewFilteredIndices.length > 0) {
                 let idx = reviewFilteredIndices.indexOf(currentQ);
-                if (idx > 0) {
-                    loadQuestion(reviewFilteredIndices[idx - 1]);
-                }
+                if (idx > 0) loadQuestion(reviewFilteredIndices[idx - 1]);
                 return;
             }
+            
             let targetQ = currentQ - 1;
+            
             if (examType === 'mock' && currentMode === 'test') {
-                if(targetQ < mockBoundaries[activeSectionIndex].start) return; 
+                let currentBounds = mockBoundaries[activeSectionIndex];
+                
+                if(targetQ < currentBounds.start) {
+                    // SEAMLESS BACKWARDS JUMP LOGIC
+                    if (mockPhysicsMode === 'open') {
+                        if (activeSectionIndex > 0) {
+                            activeSectionIndex--;
+                            loadQuestion(mockBoundaries[activeSectionIndex].end);
+                            buildPalette();
+                        }
+                    } else if (mockPhysicsMode === 'session-pool') {
+                        let prevIdx = activeSectionIndex - 1;
+                        if (prevIdx >= 0 && mockBoundaries[prevIdx].sessionId === currentBounds.sessionId) {
+                            activeSectionIndex = prevIdx;
+                            loadQuestion(mockBoundaries[activeSectionIndex].end);
+                            buildPalette();
+                        }
+                    }
+                    return; 
+                }
             } else if (targetQ < 0) return;
+            
             loadQuestion(targetQ); 
         }
 
