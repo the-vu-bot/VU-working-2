@@ -749,30 +749,27 @@
         const repoOwner = 'the-vu-bot';
         const repoName = 'VU-Vault';
 
-        // ==========================================
-        // 🔒 AUTHENTICATION & VAULT DECRYPTION
-        // ==========================================
+        // --- AUTH & INIT (Secured for Private GitHub Repo) ---
         async function checkAuth() {
-            const savedKey = localStorage.getItem('vu_unlocked_key');
-            let token = localStorage.getItem(STORAGE_GITHUB_TOKEN);
+            const savedKey = localStorage.getItem('vu_active_db');
+            const token = localStorage.getItem('vu_pat');
             
-            if(savedKey && token) {
+            if (savedKey && token) {
                 try {
-                    const apiUrl = `https://api.github.com/repos/the-vu-bot/exam-engine-vu/contents/${savedKey}.json`;
+                    const apiUrl = `https://api.github.com/repos/the-vu-bot/VU-Vault/contents/${savedKey}.json`;
                     const response = await fetch(apiUrl, { 
-                        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } 
+                        headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } 
                     });
                     
-                    if(response.ok) {
+                    if (response.ok) {
                         const fileData = await response.json();
+                        // Decrypt the Base64 file from GitHub
                         const jsonString = decodeURIComponent(escape(atob(fileData.content)));
                         masterBank = JSON.parse(jsonString);
                         
-                        setupDashboard();
-                        if(!restoreSession()) {
-                            document.getElementById('lock-screen').style.display = 'none';
-                            document.getElementById('home-screen').style.display = 'flex';
-                        }
+                        document.getElementById('lock-screen').style.display = 'none';
+                        document.getElementById('home-screen').style.display = 'flex';
+                        initEngineOfflineBypass();
                         return;
                     }
                 } catch(e) { console.log("Auto-login failed:", e); }
@@ -783,30 +780,31 @@
 
         async function verifyPin() {
             const input = document.getElementById('pin-input').value.trim();
-            if(!input) return;
+            if (!input) return;
             
-            let token = localStorage.getItem(STORAGE_GITHUB_TOKEN);
+            let token = localStorage.getItem('vu_pat');
             if (!token) {
                 token = prompt("Enter your GitHub PAT to connect to the Vault:");
                 if (!token) return;
-                localStorage.setItem(STORAGE_GITHUB_TOKEN, token);
+                localStorage.setItem('vu_pat', token);
             }
 
             const btn = document.getElementById('unlock-btn');
-            btn.innerText = "Connecting to GitHub...";
+            btn.innerText = "Connecting to Vault...";
             
             try {
-                const apiUrl = `https://api.github.com/repos/the-vu-bot/exam-engine-vu/contents/${input}.json`;
+                // Fetch directly from your VU-Vault repo
+                const apiUrl = `https://api.github.com/repos/the-vu-bot/VU-Vault/contents/${input}.json`;
                 const response = await fetch(apiUrl, { 
-                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } 
+                    headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } 
                 });
                 
                 if (!response.ok) { 
-                    if (response.status === 401 || response.status === 403) {
-                        alert("❌ GitHub Access Denied! Your PAT might be expired or incorrect. Please enter it again.");
-                        localStorage.removeItem(STORAGE_GITHUB_TOKEN); // Delete the bad token
+                    if (response.status === 401 || response.status === 403 || response.status === 404) {
+                        alert("❌ Access Denied! Repo 'VU-Vault' not found, or your PAT is invalid.");
+                        localStorage.removeItem('vu_pat'); // Delete bad token to allow re-entry
                     } else {
-                        alert("❌ Vault File not found! Check if '" + input + ".json' exists in your repo.");
+                        alert(`❌ Vault File not found! Check if '${input}.json' exists in your repo.`);
                     }
                     btn.innerText = "Unlock Engine"; 
                     return; 
@@ -816,56 +814,44 @@
                 const jsonString = decodeURIComponent(escape(atob(fileData.content)));
                 masterBank = JSON.parse(jsonString);
                 
-                localStorage.setItem('vu_unlocked_key', input);
-                setupDashboard();
-                if(!restoreSession()) {
-                    document.getElementById('lock-screen').style.display = 'none';
-                    document.getElementById('home-screen').style.display = 'flex';
-                }
+                localStorage.setItem('vu_active_db', input);
+                
+                document.getElementById('lock-screen').style.display = 'none';
+                document.getElementById('home-screen').style.display = 'flex';
+                initEngineOfflineBypass();
             } catch (e) { 
-                alert("Network error. Your browser is blocking the connection."); 
+                alert("Network error. Cannot connect to GitHub API."); 
             }
             btn.innerText = "Unlock Engine";
         }
 
         function lockEngine() {
-            localStorage.removeItem('vu_unlocked_key');
-            localStorage.removeItem(STORAGE_SESSION);
+            localStorage.removeItem('vu_active_db');
             location.reload();
         }
 
-        document.getElementById("pin-input").addEventListener("keypress", (e) => { if (e.key === "Enter") verifyPin(); });
-
-        async function initEngine() {
-            try {
-                document.getElementById('db-stats').innerText = 'Syncing Master Vault...';
-                const response = await fetch(MASTER_JSON_URL + '?t=' + new Date().getTime());
-                masterBank = await response.json();
-                
-                let subjects = new Set(masterBank.map(q => q.subject));
-                globalActiveSubjects = Array.from(subjects).sort();
-                
-                let savedActive = JSON.parse(localStorage.getItem('vu_active_subjects'));
-                if (savedActive && savedActive.length > 0) {
-                    globalActiveSubjects = savedActive.filter(s => subjects.has(s));
-                }
-
-                // Restore Memory Inputs
-                document.getElementById('set-sprint-time').value = customSprintTime;
-                document.getElementById('set-sprint-qs').value = customSprintQs;
-                document.getElementById('set-practice-qs').value = customPracticeQs;
-                document.getElementById('set-calc-qs').value = customCalcQs;
-
-                let defaultLang = localStorage.getItem('vu_default_lang') || 'hi';
-                document.getElementById('default-lang-select').value = defaultLang;
-
-                applyMockPreset(activePresetId);
-                populateHomeDropdowns();
-                document.getElementById('db-stats').innerText = `Vault Active: ${masterBank.length} Qs across ${subjects.size} subjects.`;
-            } catch (error) {
-                document.getElementById('db-stats').innerText = 'Offline Mode / Vault Fetch Failed.';
-                document.getElementById('db-stats').style.color = 'var(--cbt-red)';
+        function initEngineOfflineBypass() {
+            let subjects = new Set(masterBank.map(q => q.subject));
+            globalActiveSubjects = Array.from(subjects).sort();
+            
+            let savedActive = JSON.parse(localStorage.getItem('vu_active_subjects'));
+            if (savedActive && savedActive.length > 0) {
+                globalActiveSubjects = savedActive.filter(s => subjects.has(s));
             }
+
+            // Restore Memory Inputs
+            document.getElementById('set-sprint-time').value = customSprintTime;
+            document.getElementById('set-sprint-qs').value = customSprintQs;
+            document.getElementById('set-practice-qs').value = customPracticeQs;
+            document.getElementById('set-calc-qs').value = customCalcQs;
+
+            let defaultLang = localStorage.getItem('vu_default_lang') || 'hi';
+            document.getElementById('default-lang-select').value = defaultLang;
+
+            applyMockPreset(activePresetId);
+            populateHomeDropdowns();
+            document.getElementById('db-stats').innerText = `Vault Active: ${masterBank.length} Qs across ${subjects.size} subjects.`;
+            document.getElementById('db-stats').style.color = 'var(--cbt-blue)';
         }
 
         function populateHomeDropdowns() {
