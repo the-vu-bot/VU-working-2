@@ -478,6 +478,7 @@
                     <span style="cursor:pointer; color:#eee;" onclick="closePresetEditor()">✖</span>
                 </div>
             </div>
+            
             <div class="settings-body" style="padding: 20px;">
                 <input type="hidden" id="edit-preset-id">
                 
@@ -498,11 +499,14 @@
                         </label>
                     </div>
                 </div>
+
+                <div id="bucket-config-area">
                     <label style="font-weight:bold; font-size:0.85rem; color:var(--cbt-blue);">Session Breaks (Buckets)</label>
                     <div style="font-size:0.75rem; color:#888; margin-bottom:8px;">How many subjects go into each session before a break? (Comma separated, e.g., 2,2,1). Leave blank for NO breaks.</div>
                     <input type="text" id="edit-preset-buckets" class="settings-input" style="text-align:left; width:100%;" placeholder="e.g., 2,2,1">
                 </div>
             </div>
+            
             <div class="settings-footer" style="justify-content: space-between;">
                 <button id="btn-delete-preset" class="btn btn-outline" style="border-color:var(--cbt-red); color:var(--cbt-red);" onclick="deleteActivePreset()">🗑️ Delete</button>
                 <div style="display:flex; gap:10px;">
