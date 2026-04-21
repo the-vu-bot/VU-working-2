@@ -749,23 +749,76 @@
         const repoOwner = 'the-vu-bot';
         const repoName = 'VU-Vault';
 
-        // --- AUTH & INIT ---
-        function checkAuth() {
-            if (localStorage.getItem('vu_auth') === 'true') {
-                document.getElementById('lock-screen').style.display = 'none';
-                document.getElementById('home-screen').style.display = 'flex';
-                initEngine();
+        // AUTHENTICATION (Upgraded for Private GitHub Repo)
+        async function checkAuth() {
+            const savedKey = localStorage.getItem('vu_unlocked_key');
+            let token = localStorage.getItem(STORAGE_GITHUB_TOKEN);
+            
+            if(savedKey && token) {
+                try {
+                    const apiUrl = `https://api.github.com/repos/the-vu-bot/exam-engine-vu/contents/${savedKey}.json`;
+                    const response = await fetch(apiUrl, { 
+                        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } 
+                    });
+                    
+                    if(response.ok) {
+                        const fileData = await response.json();
+                        const jsonString = decodeURIComponent(escape(atob(fileData.content)));
+                        masterBank = JSON.parse(jsonString);
+                        
+                        setupDashboard();
+                        if(!restoreSession()) {
+                            document.getElementById('lock-screen').style.display = 'none';
+                            document.getElementById('home-screen').style.display = 'flex';
+                        }
+                        return;
+                    }
+                } catch(e) { console.log("Auto-login failed:", e); }
             }
+            document.getElementById('lock-screen').style.display = 'flex';
+            document.getElementById('home-screen').style.display = 'none';
         }
 
-        function verifyPin() {
-            const pin = document.getElementById('pin-input').value;
-            if (pin === '0000') {
-                localStorage.setItem('vu_auth', 'true');
-                checkAuth();
-            } else {
-                alert("Vault Access Denied.");
+        async function verifyPin() {
+            const input = document.getElementById('pin-input').value.trim();
+            if(!input) return;
+            
+            let token = localStorage.getItem(STORAGE_GITHUB_TOKEN);
+            if (!token) {
+                token = prompt("Enter your GitHub PAT to access the Vault:");
+                if (!token) return;
+                localStorage.setItem(STORAGE_GITHUB_TOKEN, token);
             }
+
+            const btn = document.getElementById('unlock-btn');
+            btn.innerText = "Verifying...";
+            
+            try {
+                const apiUrl = `https://api.github.com/repos/the-vu-bot/exam-engine-vu/contents/${input}.json`;
+                const response = await fetch(apiUrl, { 
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } 
+                });
+                
+                if (!response.ok) { 
+                    alert("❌ Vault File not found! Check your filename and PAT."); 
+                    btn.innerText = "Unlock Engine"; 
+                    return; 
+                }
+                
+                const fileData = await response.json();
+                const jsonString = decodeURIComponent(escape(atob(fileData.content)));
+                masterBank = JSON.parse(jsonString);
+                
+                localStorage.setItem('vu_unlocked_key', input);
+                setupDashboard();
+                if(!restoreSession()) {
+                    document.getElementById('lock-screen').style.display = 'none';
+                    document.getElementById('home-screen').style.display = 'flex';
+                }
+            } catch (e) { 
+                alert("Network error. Cannot connect to GitHub API."); 
+            }
+            btn.innerText = "Unlock Engine";
         }
 
         function lockEngine() {
