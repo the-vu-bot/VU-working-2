@@ -2915,15 +2915,17 @@
 
         // --- NEW EXTRACTED DEEP-DIVE SLICER ---
         function renderDeepDiveSlicer() {
-            if (journeyFilterType !== 'mock') {
+            // Updated to detect "Mock" or "Custom Exam" names
+            const isMockMode = journeyFilterType === 'mock' || journeyFilterType === 'all';
+            if (!isMockMode) {
                 activeMockSubject = 'Overall';
                 return '';
             }
             
-            // Auto-detect available subjects from your Vault memory
             let availableSubjects = new Set();
             cachedJourneyData.forEach(d => {
-                if(d.ExamType === 'Full Mock') {
+                // SMART DETECT: Look inside any test that is a Mock/Custom Exam
+                if(d.ExamType.includes('Mock') || d.ExamType.includes('Custom Exam')) {
                     Object.keys(d).forEach(key => {
                         if (key.endsWith('_Score')) availableSubjects.add(key.replace('_Score', ''));
                     });
