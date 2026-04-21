@@ -1707,24 +1707,34 @@
                     document.getElementById('sec-timer').innerText = formatTime(sectionalSeconds);
                     
                     if (sectionalSeconds <= 0) {
-                        let currentSessionId = mockBoundaries[activeSectionIndex].sessionId;
-                        let lastSubjectInSession = mockBoundaries.filter(b => b.sessionId === currentSessionId).pop();
-                        let triggerBreak = lastSubjectInSession ? lastSubjectInSession.isSessionEnd : false;
-                        
-                        // Find the first subject of the NEXT session
-                        let nextSessionIdx = mockBoundaries.findIndex((b, i) => i > activeSectionIndex && b.sessionId !== currentSessionId);
-                        
-                        if (nextSessionIdx !== -1) {
-                            activeSectionIndex = nextSessionIdx;
+                        let nextIdx = -1;
+                        let triggerBreak = false;
+
+                        // NEW LOGIC: Determine next jump based on Physics Mode
+                        if (mockPhysicsMode === 'subject-strict') {
+                            // In strict mode, just go to the very next subject index
+                            if (activeSectionIndex + 1 < mockBoundaries.length) {
+                                nextIdx = activeSectionIndex + 1;
+                            }
+                        } else if (mockPhysicsMode === 'session-pool') {
+                            // In pool mode, find the next subject that belongs to a DIFFERENT session
+                            let currentSessionId = mockBoundaries[activeSectionIndex].sessionId;
+                            triggerBreak = mockBoundaries[activeSectionIndex].isSessionEnd;
+                            nextIdx = mockBoundaries.findIndex((b, i) => i > activeSectionIndex && b.sessionId !== currentSessionId);
+                        }
+
+                        if (nextIdx !== -1) {
+                            activeSectionIndex = nextIdx;
                             sectionalSeconds = mockBoundaries[activeSectionIndex].allocatedTime; 
                             loadQuestion(mockBoundaries[activeSectionIndex].start); 
                             buildPalette();
                             
-                            if ((mockPhysicsMode === 'session-pool' || mockPhysicsMode === 'session-strict') && triggerBreak) {
-                                let nextSubName = mockBoundaries[activeSectionIndex].name;
+                            if (triggerBreak) {
                                 triggerSessionBreak("Session Completed 🛑", `Take a breath. Click below to start next session.`);
                             }
-                        } else { submitExam(); }
+                        } else { 
+                            submitExam(); // End of the line - Submit test
+                        }
                     }
                 } else if (examType === 'sprint' && currentMode === 'test') {
                     totalSeconds--; document.getElementById('timer').innerText = formatTime(totalSeconds);
