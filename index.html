@@ -2877,7 +2877,10 @@
                 let matchType = true;
                 let matchSub = true;
 
-                if (journeyFilterType === 'mock') matchType = t.ExamType === 'Full Mock';
+                // SMART FILTER: Detects any Full Mock variant (Custom, Pool, Strict)
+                if (journeyFilterType === 'mock') {
+                    matchType = t.ExamType.includes('Mock') || t.ExamType.includes('Custom Exam');
+                }
                 else if (journeyFilterType === 'sprint') matchType = t.ExamType.includes('Sprint');
 
                 // If looking at sprints, filter by selected subject
@@ -2992,11 +2995,19 @@
                             attempted++;
                             // Cross-reference with Master Bank to verify Correct/Wrong
                             let q = masterBank.find(mq => mq.uid === payload.uids[i]);
-                            if(q && s.selected === q.correct) correct++;
-                            else wrong++;
+                            
+                            if(q) {
+                                // If question found in bank, use live logic
+                                if(s.selected === q.correct) correct++;
+                                else wrong++;
+                            } else {
+                                // FALLBACK: If bank isn't ready or UID changed, use the sheet accuracy
+                                if (parseFloat(test.Accuracy) === 100) correct++;
+                                else wrong++;
+                            }
                         }
                     });
-                } catch(e) {}
+                } catch(e) { console.error("Payload parse error", e); }
                 let totalQs = payload.uids ? payload.uids.length : 0;
 
                 html += `
