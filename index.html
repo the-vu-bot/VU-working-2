@@ -483,37 +483,21 @@
                 
                 <label style="font-weight:bold; font-size:0.9rem; color:#333;">Exam Name</label>
                 <input type="text" id="edit-preset-name" class="settings-input" style="text-align:left; margin-bottom:15px; width:100%;" placeholder="e.g., Selection Post Phase XII">
-                
-                <div style="display:flex; gap:10px; margin-bottom:15px;">
-                    <div style="flex:1;">
-                        <label style="font-weight:bold; font-size:0.85rem; color:#555;">Total Time (Mins)</label>
-                        <input type="number" id="edit-preset-time" class="settings-input" style="width:100%;">
-                    </div>
-                    <div style="flex:1;">
-                        <label style="font-weight:bold; font-size:0.85rem; color:#555;">Total Questions</label>
-                        <input type="number" id="edit-preset-qs" class="settings-input" style="width:100%;">
-                    </div>
-                </div>
 
                 <div style="margin-bottom:15px; border:1px solid #ddd; border-radius:6px; overflow:hidden;">
                     <div style="background:#eee; padding:8px; font-weight:bold; font-size:0.85rem; color:#333;">Navigation Physics</div>
                     <div style="padding:10px; display:flex; flex-direction:column; gap:8px; background:#fcfcfc;">
                         <label style="font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:5px;">
-                            <input type="radio" name="edit-preset-physics" value="open"> 🔓 Open (1 Master Timer, Jump Anywhere)
+                            <input type="radio" name="edit-preset-physics" value="open" onchange="togglePresetBucketUI()"> 🔓 Open (1 Master Timer, Jump Anywhere)
                         </label>
                         <label style="font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:5px;">
-                            <input type="radio" name="edit-preset-physics" value="subject-strict"> 🔒 Subject Strict (Individual Timers, No Going Back)
+                            <input type="radio" name="edit-preset-physics" value="subject-strict" onchange="togglePresetBucketUI()"> 🔒 Subject Strict (Individual Timers, No Going Back)
                         </label>
                         <label style="font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:5px;">
-                            <input type="radio" name="edit-preset-physics" value="session-pool"> 📦 Session Pool (Shared Bucket Time, Jump inside Bucket)
-                        </label>
-                        <label style="font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:5px;">
-                            <input type="radio" name="edit-preset-physics" value="session-strict"> ⏱️ Session Strict (Individual Timers, Breaks at Bucket End)
+                            <input type="radio" name="edit-preset-physics" value="session-pool" onchange="togglePresetBucketUI()"> 📦 Session Pool (Shared Bucket Time, Jump inside Bucket)
                         </label>
                     </div>
                 </div>
-
-                <div id="bucket-config-area" style="margin-bottom:10px;">
                     <label style="font-weight:bold; font-size:0.85rem; color:var(--cbt-blue);">Session Breaks (Buckets)</label>
                     <div style="font-size:0.75rem; color:#888; margin-bottom:8px;">How many subjects go into each session before a break? (Comma separated, e.g., 2,2,1). Leave blank for NO breaks.</div>
                     <input type="text" id="edit-preset-buckets" class="settings-input" style="text-align:left; width:100%;" placeholder="e.g., 2,2,1">
@@ -611,10 +595,10 @@
                         <div class="mode-title">☁️ Auto-Merge Cloud Sync</div>
                         <div class="mode-desc" style="margin-bottom:0;">Securely merges device data with GitHub Vault.</div>
                     </div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; flex: 1;">
-                        <button class="btn btn-outline" style="flex: 1 1 0%; padding: 6px 8px; white-space: nowrap; border-color: var(--cbt-red); color: var(--cbt-red);" onclick="scanForOrphans()">🧹 Maintenance</button>
-                        <button id="cloud-push-btn" class="btn btn-outline" style="flex: 1 1 0%; padding: 6px 8px; white-space: nowrap; border-color: #d9a05b; color: #b87a29;" onclick="pushToCloud()">↑ Push / Sync</button>
-                        <button id="cloud-pull-btn" class="btn btn-outline" style="flex: 1 1 0%; padding: 6px 8px; white-space: nowrap; border-color: #5b9bd9; color: #297ab8;" onclick="pullFromCloud()">↓ Pull / Restore</button>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; flex: 1; align-items:center;">
+                        <button class="btn btn-outline" style="width: 36px; height: 36px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; border-color: var(--cbt-red); color: var(--cbt-red);" onclick="scanForOrphans()" title="Maintenance">🧹</button>
+                        <button id="cloud-push-btn" class="btn btn-outline" style="flex: 1 1 0%; padding: 6px 8px; white-space: nowrap; border-color: #d9a05b; color: #b87a29;" onclick="pushToCloud()">↑ Push</button>
+                        <button id="cloud-pull-btn" class="btn btn-outline" style="flex: 1 1 0%; padding: 6px 8px; white-space: nowrap; border-color: #5b9bd9; color: #297ab8;" onclick="pullFromCloud()">↓ Pull</button>
                     </div>
                 </div>
 
@@ -1105,7 +1089,25 @@
             });
         }
 
-        // --- 3. EDITOR MODAL CONTROLS (Updated for 4-Tier) ---
+        // --- 3. EDITOR MODAL CONTROLS (Updated for 3-Tier) ---
+        function togglePresetBucketUI() {
+            let physicsNode = document.querySelector('input[name="edit-preset-physics"]:checked');
+            let physics = physicsNode ? physicsNode.value : 'open';
+            let bucketInput = document.getElementById('edit-preset-buckets');
+            let bucketLabel = document.getElementById('bucket-config-area');
+            
+            if (physics === 'session-pool') {
+                bucketInput.disabled = false;
+                bucketInput.style.background = '#fff';
+                bucketLabel.style.opacity = '1';
+            } else {
+                bucketInput.disabled = true;
+                bucketInput.style.background = '#eee';
+                bucketInput.value = '';
+                bucketLabel.style.opacity = '0.5';
+            }
+        }
+
         function openPresetEditor(id) {
             document.getElementById('preset-editor-overlay').style.display = 'flex';
             const delBtn = document.getElementById('btn-delete-preset');
@@ -1116,36 +1118,33 @@
                     document.getElementById('preset-modal-title').innerText = '✏️ Edit Exam';
                     document.getElementById('edit-preset-id').value = p.id;
                     document.getElementById('edit-preset-name').value = p.name;
-                    document.getElementById('edit-preset-time').value = p.time;
-                    document.getElementById('edit-preset-qs').value = p.qs;
                     
                     let activePhysics = p.physics || (p.locked ? 'subject-strict' : 'open');
                     let radioBtn = document.querySelector(`input[name="edit-preset-physics"][value="${activePhysics}"]`);
                     if(radioBtn) radioBtn.checked = true;
                     
-                    document.getElementById('edit-preset-buckets').value = p.buckets || '';
+                    // Handle old preset array formats safely
+                    let bVal = Array.isArray(p.buckets) ? p.buckets.join(',') : (p.buckets || '');
+                    document.getElementById('edit-preset-buckets').value = bVal;
                     delBtn.style.display = (id === 'custom') ? 'none' : 'block';
                 }
             } else {
                 document.getElementById('preset-modal-title').innerText = '➕ New Exam';
                 document.getElementById('edit-preset-id').value = '';
                 document.getElementById('edit-preset-name').value = 'New Exam';
-                document.getElementById('edit-preset-time').value = 60;
-                document.getElementById('edit-preset-qs').value = 100;
                 document.querySelector(`input[name="edit-preset-physics"][value="open"]`).checked = true;
                 document.getElementById('edit-preset-buckets').value = '';
                 delBtn.style.display = 'none';
             }
+            togglePresetBucketUI();
         }
 
         function closePresetEditor() { document.getElementById('preset-editor-overlay').style.display = 'none'; }
 
-        // --- 4. SAVE EXAMS (Updated for 4-Tier) ---
+        // --- 4. SAVE EXAMS ---
         function savePresetData() {
             let id = document.getElementById('edit-preset-id').value;
             let name = document.getElementById('edit-preset-name').value.trim() || 'Unnamed Exam';
-            let time = parseInt(document.getElementById('edit-preset-time').value) || 60;
-            let qs = parseInt(document.getElementById('edit-preset-qs').value) || 100;
             
             let physicsNode = document.querySelector('input[name="edit-preset-physics"]:checked');
             let physics = physicsNode ? physicsNode.value : 'open';
@@ -1154,10 +1153,14 @@
 
             if (id) {
                 let idx = examPresets.findIndex(x => x.id === id);
-                if(idx > -1) examPresets[idx] = { id, name, time, qs, physics, buckets };
+                if(idx > -1) {
+                    examPresets[idx].name = name;
+                    examPresets[idx].physics = physics;
+                    examPresets[idx].buckets = buckets;
+                }
             } else {
                 let newId = 'preset_' + Date.now();
-                examPresets.push({ id: newId, name, time, qs, physics, buckets });
+                examPresets.push({ id: newId, name, time: 60, qs: 100, physics, buckets });
                 id = newId;
             }
 
@@ -1174,7 +1177,7 @@
                 examPresets = examPresets.filter(x => x.id !== id);
                 localStorage.setItem('vu_exam_presets', JSON.stringify(examPresets));
                 closePresetEditor();
-                applyMockPreset('custom'); // Fallback to custom
+                applyMockPreset('custom'); 
             }
         }
 
@@ -1239,23 +1242,17 @@
         }
 
         function saveSettings() {
-            userSprintTime = parseInt(document.getElementById('set-sprint-time').value) || 15;
-            userSprintQs = parseInt(document.getElementById('set-sprint-qs').value) || 25;
-            userMockGlobalTime = parseInt(document.getElementById('set-mock-global-time').value) || 60;
-            userMockGlobalQs = parseInt(document.getElementById('set-mock-global-qs').value) || 100;
-            syncFromSectional(); 
-            localStorage.setItem('vu_sprint_time', userSprintTime);
-            localStorage.setItem('vu_sprint_qs', userSprintQs);
-            localStorage.setItem('vu_mock_global_time', userMockGlobalTime);
-            localStorage.setItem('vu_mock_global_qs', userMockGlobalQs);
-            localStorage.setItem('vu_mock_split_mode', userMockSplitMode);
-            localStorage.setItem('vu_mock_sec_data', JSON.stringify(userMockSecData));
-            userPracticeQs = parseInt(document.getElementById('set-practice-qs').value) || 50;
-            userCalcQs = parseInt(document.getElementById('set-calc-qs').value) || 50;
-            localStorage.setItem('vu_practice_qs', userPracticeQs);
-            localStorage.setItem('vu_calc_qs', userCalcQs);
-            localStorage.setItem('vu_mock_preset', userMockPreset);
-            updateDashboardDropdowns();
+            customSprintTime = parseInt(document.getElementById('set-sprint-time').value) || 15;
+            customSprintQs = parseInt(document.getElementById('set-sprint-qs').value) || 25;
+            customPracticeQs = parseInt(document.getElementById('set-practice-qs').value) || 50;
+            customCalcQs = parseInt(document.getElementById('set-calc-qs').value) || 50;
+
+            localStorage.setItem('vu_sprint_time', customSprintTime);
+            localStorage.setItem('vu_sprint_qs', customSprintQs);
+            localStorage.setItem('vu_practice_qs', customPracticeQs);
+            localStorage.setItem('vu_calc_qs', customCalcQs);
+
+            updateMockSecData(); // Keeps your mock timings synced
             closeSettings();
         }
 
