@@ -1879,27 +1879,32 @@
                     }
                 });
 
-                // POST-PROCESS: Pool times for 'session-pool' mode
+                // POST-PROCESS: Accurate Math for 'session-pool' mode
                 if (mockPhysicsMode === 'session-pool') {
-                    let sessionTimeTotals = {};
+                    // 1. Assign the correct Custom Session Time to each boundary
                     mockBoundaries.forEach(b => {
-                        if (!sessionTimeTotals[b.sessionId]) sessionTimeTotals[b.sessionId] = 0;
-                        sessionTimeTotals[b.sessionId] += b.allocatedTime;
+                        let sessTime = userMockSessionData[b.sessionId] || 60;
+                        b.allocatedTime = sessTime * 60;
                     });
-                    mockBoundaries.forEach(b => {
-                        b.allocatedTime = sessionTimeTotals[b.sessionId];
+                    
+                    // 2. Calculate Total Time without double-counting shared sessions
+                    let uniqueSessions = [...new Set(mockBoundaries.map(b => b.sessionId))];
+                    totalSeconds = 0;
+                    uniqueSessions.forEach(sid => {
+                        totalSeconds += (userMockSessionData[sid] || 60) * 60;
                     });
+                } else {
+                    // For Open or Subject-Strict, just sum the individual boundaries
+                    totalSeconds = mockBoundaries.reduce((sum, b) => sum + b.allocatedTime, 0);
                 }
+
                 if(questions.length === 0) { alert("Add questions to JSON first or select active subjects!"); return; }
                 activeSectionIndex = 0;
                 sectionalSeconds = mockBoundaries.length > 0 ? mockBoundaries[0].allocatedTime : 0; 
-                totalSeconds = mockBoundaries.reduce((sum, b) => sum + b.allocatedTime, 0); 
+                
                 document.getElementById('cbt-title').innerHTML = `Full Mock <span style="font-size:0.8rem; color:#888;">(VU)</span>`;
-                if (mockPhysicsMode === 'open') {
-                    document.getElementById('sectional-timer-wrapper').style.display = 'none';
-                } else {
-                    document.getElementById('sectional-timer-wrapper').style.display = 'flex';
-                }
+                // Make sure section timer is hidden safely in Open mode
+                document.getElementById('sectional-timer-wrapper').style.display = mockPhysicsMode === 'open' ? 'none' : 'flex';
             } else {
                 let filtered = [];
                 if (isCalcDrill) { 
