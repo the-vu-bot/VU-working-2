@@ -1108,6 +1108,22 @@
             }
         }
 
+        // --- EXAM ARCHITECT MODAL CONTROLS ---
+        function togglePresetBucketUI() {
+            let physicsNode = document.querySelector('input[name="edit-preset-physics"]:checked');
+            let physics = physicsNode ? physicsNode.value : 'open';
+            let bucketInput = document.getElementById('edit-preset-buckets');
+            let bucketLabel = document.getElementById('bucket-config-area');
+            
+            if (physics === 'session-pool') {
+                if(bucketInput) { bucketInput.disabled = false; bucketInput.style.background = '#fff'; }
+                if(bucketLabel) { bucketLabel.style.opacity = '1'; }
+            } else {
+                if(bucketInput) { bucketInput.disabled = true; bucketInput.style.background = '#eee'; bucketInput.value = ''; }
+                if(bucketLabel) { bucketLabel.style.opacity = '0.5'; }
+            }
+        }
+
         function openPresetEditor(id) {
             document.getElementById('preset-editor-overlay').style.display = 'flex';
             const delBtn = document.getElementById('btn-delete-preset');
@@ -1123,25 +1139,27 @@
                     let radioBtn = document.querySelector(`input[name="edit-preset-physics"][value="${activePhysics}"]`);
                     if(radioBtn) radioBtn.checked = true;
                     
-                    // Handle old preset array formats safely
                     let bVal = Array.isArray(p.buckets) ? p.buckets.join(',') : (p.buckets || '');
-                    document.getElementById('edit-preset-buckets').value = bVal;
-                    delBtn.style.display = (id === 'custom') ? 'none' : 'block';
+                    if(document.getElementById('edit-preset-buckets')) document.getElementById('edit-preset-buckets').value = bVal;
+                    
+                    if(delBtn) delBtn.style.display = (id === 'custom') ? 'none' : 'block';
                 }
             } else {
                 document.getElementById('preset-modal-title').innerText = '➕ New Exam';
                 document.getElementById('edit-preset-id').value = '';
                 document.getElementById('edit-preset-name').value = 'New Exam';
-                document.querySelector(`input[name="edit-preset-physics"][value="open"]`).checked = true;
-                document.getElementById('edit-preset-buckets').value = '';
-                delBtn.style.display = 'none';
+                let openRadio = document.querySelector(`input[name="edit-preset-physics"][value="open"]`);
+                if(openRadio) openRadio.checked = true;
+                if(document.getElementById('edit-preset-buckets')) document.getElementById('edit-preset-buckets').value = '';
+                if(delBtn) delBtn.style.display = 'none';
             }
             togglePresetBucketUI();
         }
 
-        function closePresetEditor() { document.getElementById('preset-editor-overlay').style.display = 'none'; }
+        function closePresetEditor() { 
+            document.getElementById('preset-editor-overlay').style.display = 'none'; 
+        }
 
-        // --- 4. SAVE EXAMS ---
         function savePresetData() {
             let id = document.getElementById('edit-preset-id').value;
             let name = document.getElementById('edit-preset-name').value.trim() || 'Unnamed Exam';
@@ -1152,7 +1170,7 @@
             let bucketEl = document.getElementById('edit-preset-buckets');
             let buckets = bucketEl ? bucketEl.value.trim() : '';
 
-            // Fallback to global defaults since manual boxes are gone
+            // Pull from global memory
             let time = userMockGlobalTime || 60;
             let qs = userMockGlobalQs || 100;
 
@@ -1172,10 +1190,6 @@
             localStorage.setItem('vu_exam_presets', JSON.stringify(examPresets));
             closePresetEditor();
             applyMockPreset(id); 
-        }
-
-        function closePresetEditor() { 
-            document.getElementById('preset-editor-overlay').style.display = 'none'; 
         }
 
         function deleteActivePreset() {
