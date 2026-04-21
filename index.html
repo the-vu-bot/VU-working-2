@@ -1612,7 +1612,7 @@
                 activeSectionIndex, examType, defaultLang, currentLang, 
                 mockBoundaries, timeSpentGlobal, currentMode, forcedEn, isCalcDrill,
                 revFilters, revCurrentPage, revSubjectState, revTopicState, globalActiveSubjects,
-                activePresetId // Store this to keep analytics accurate on refresh
+                activePresetId // <-- THIS KEEPS ANALYTICS SAFE ON REFRESH
             };
             localStorage.setItem(STORAGE_SESSION, JSON.stringify(session));
         }
@@ -1633,38 +1633,65 @@
 
                 document.getElementById('lock-screen').style.display = 'none';
                 document.getElementById('home-screen').style.display = 'none';
+                fetchPrivateImage(`https://raw.githubusercontent.com/the-vu-bot/exam-engine-vu/main/solutions/VU-logo.jpg`, 'home-logo');
                 
-                // --- NEW PERSISTENCE JUMPS ---
+                // --- THE MISSING JOURNEY REFRESH LOGIC ---
                 if (currentMode === 'journey') {
                     openJourneyPage();
                     return true;
                 }
 
                 if (currentMode === 'revision') {
-                    openRevisionPage();
-                    return true;
+                    let optionsHtml = `<option value="all">Active Subjects</option>`;
+                    globalActiveSubjects.forEach(sub => { optionsHtml += `<option value="${sub}">${sub}</option>`; });
+                    document.getElementById('rev-subj-filter').innerHTML = optionsHtml;
+                    
+                    document.getElementById('rev-subj-filter').value = revSubjectState;
+                    updateTopicDropdown();
+                    document.getElementById('rev-topic-filter').value = revTopicState;
+                    
+                    if(document.getElementById('exam-screen')) document.getElementById('exam-screen').style.display = 'none';
+                    document.getElementById('cbt-screen').style.display = 'none';
+                    document.getElementById('analysis-screen').style.display = 'none';
+                    document.getElementById('revision-screen').style.display = 'flex';
+                    renderRevisionFeed();
+                    return true; 
                 }
                 
-                if (currentMode === 'analysis') {
-                    renderAnalyticsDisplay();
-                    document.getElementById('analysis-screen').style.display = 'flex';
-                    return true;
-                }
-
-                // Default CBT Load
                 if (examType === 'mock') document.getElementById('cbt-title').innerHTML = `Full Mock <span style="font-size:0.8rem; color:#888;">(VU)</span>`;
                 else document.getElementById('cbt-title').innerHTML = `${examType === 'sprint' ? "Sprint" : "Practice"} <span style="font-size:0.8rem; color:#888;">(VU)</span>`;
 
+                if (currentMode === 'analysis') {
+                    renderAnalyticsDisplay(); showDashboard(); return true;
+                }
+
                 document.getElementById('cbt-screen').style.display = 'flex';
+                document.getElementById('default-lang-select').value = defaultLang;
                 document.getElementById('lang-select').value = currentLang;
-                if(examType === 'mock' && mockPhysicsMode !== 'open') document.getElementById('sectional-timer-wrapper').style.display = 'flex';
+
+                if(examType === 'mock' && mockPhysicsMode !== 'open') {
+                    document.getElementById('sectional-timer-wrapper').style.display = 'flex';
+                } else {
+                    document.getElementById('sectional-timer-wrapper').style.display = 'none';
+                }
                 
                 buildPalette();
+
                 if (currentMode === 'review') {
-                    startReviewMode();
+                    document.getElementById('header-timer-area').style.display = 'none';
+                    document.getElementById('action-bar-test').style.display = 'none';
+                    document.getElementById('action-bar-review').style.display = 'flex';
+                    document.getElementById('review-filter-bar').style.display = 'flex';
+                    document.getElementById('mobile-submit-btn').classList.add('hide-for-review');
+                    setupReviewFilters(); 
                 } else {
+                    document.getElementById('review-filter-bar').style.display = 'none';
+                    document.getElementById('mobile-submit-btn').classList.remove('hide-for-review');
+                    document.getElementById('action-bar-test').style.display = 'flex';
+                    document.getElementById('action-bar-review').style.display = 'none';
                     loadQuestion(currentQ); pauseTest(); 
                 }
+                document.querySelector('.floating-gear').style.display = (currentMode === 'test' || currentMode === 'practice') ? 'none' : 'flex';
                 return true;
             }
             return false;
@@ -2528,14 +2555,12 @@
         }
 
         function showDashboard() {
-            if (currentMode === 'review') {
-                history.back(); // If UI Back button is clicked in review, trigger Native History
-                return;
-            }
+            currentMode = 'analysis'; // Force state update
             renderAnalyticsDisplay(); 
             document.getElementById('cbt-screen').style.display = 'none';
             document.getElementById('analysis-screen').style.display = 'flex';
             pushHistoryState('analysis'); // Track it!
+            saveTestState(); // Lock it into memory
         }
 
         function copyInsights(btnElement) {
