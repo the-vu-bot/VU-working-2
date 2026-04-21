@@ -864,6 +864,7 @@
         let activePresetId = localStorage.getItem('vu_active_preset') || 'custom';
         let userMockPreset = localStorage.getItem('vu_mock_preset') || 'custom';
         let userMockSecData = JSON.parse(localStorage.getItem('vu_mock_sec_data') || '{}');
+        let userMockSessionData = JSON.parse(localStorage.getItem('vu_mock_session_data') || '{}');
         let userPracticeQs = parseInt(localStorage.getItem('vu_practice_qs')) || 50;
         let userCalcQs = parseInt(localStorage.getItem('vu_calc_qs')) || 50;
 
@@ -1198,18 +1199,43 @@
         function syncFromSectional() {
             let totalTime = 0;
             let totalQs = 0;
+            
+            let preset = examPresets.find(p => p.id === activePresetId) || examPresets[0];
+            let physics = preset.physics || 'open';
+
+            // Sync Subject Data
             globalActiveSubjects.forEach(sub => {
                 let timeInput = document.getElementById(`sec-time-${sub}`);
                 let qsInput = document.getElementById(`sec-qs-${sub}`);
-                if(timeInput) totalTime += parseInt(timeInput.value) || 0;
                 if(qsInput) totalQs += parseInt(qsInput.value) || 0;
+                
+                if (physics === 'subject-strict' && timeInput) totalTime += parseInt(timeInput.value) || 0;
+                
                 userMockSecData[sub] = {
-                    time: timeInput ? parseInt(timeInput.value) || 0 : 0,
-                    qs: qsInput ? parseInt(qsInput.value) || 0 : 0
+                    time: timeInput ? parseInt(timeInput.value) || 0 : 15,
+                    qs: qsInput ? parseInt(qsInput.value) || 0 : 25
                 };
             });
-            if (userMockSplitMode === 'custom') { document.getElementById('set-mock-global-time').value = totalTime; }
+
+            // Sync Session Data (If in Pool mode)
+            if (physics === 'session-pool') {
+                totalTime = 0;
+                document.querySelectorAll('.sess-time-input').forEach(input => {
+                    let sid = input.getAttribute('data-sid');
+                    let val = parseInt(input.value) || 0;
+                    userMockSessionData[sid] = val;
+                    totalTime += val;
+                });
+                localStorage.setItem('vu_mock_session_data', JSON.stringify(userMockSessionData));
+            }
+
+            // Update Global Displays
+            if (physics !== 'open') {
+                document.getElementById('set-mock-global-time').value = totalTime;
+            }
             document.getElementById('set-mock-global-qs').value = totalQs;
+            
+            localStorage.setItem('vu_mock_sec_data', JSON.stringify(userMockSecData));
         }
 
         function renderSectionalDistribution() {
@@ -1219,27 +1245,64 @@
                 container.innerHTML = '<div style="text-align:center; padding:10px; color:#888;">No active subjects selected.</div>';
                 return;
             }
-            globalActiveSubjects.forEach(sub => {
+
+            let preset = examPresets.find(p => p.id === activePresetId) || examPresets[0];
+            let physics = preset.physics || (preset.locked ? 'subject-strict' : 'open');
+            
+            // Parse Buckets
+            let bucketArray = [];
+            if (preset.buckets && typeof preset.buckets === 'string' && preset.buckets.trim() !== '') {
+                bucketArray = preset.buckets.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n) && n > 0);
+            }
+
+            let currentSessId = 0;
+            let itemsInSess = 0;
+
+            globalActiveSubjects.forEach((sub, i) => {
                 if(!userMockSecData[sub]) { userMockSecData[sub] = { time: 15, qs: 25 }; }
-                let isAuto = userMockSplitMode === 'auto';
+                
+                // --- INSERT SESSION SEPARATOR ---
+                if (physics === 'session-pool' && itemsInSess === 0) {
+                    let sessTime = userMockSessionData[currentSessId] || 60;
+                    let separator = document.createElement('div');
+                    separator.style.cssText = "background:var(--cbt-purple); color:white; padding:5px 12px; border-radius:6px; font-size:0.85rem; font-weight:bold; margin-top:10px; display:flex; justify-content:space-between; align-items:center;";
+                    separator.innerHTML = `
+                        <span>📦 Session ${currentSessId + 1} Time</span>
+                        <div style="display:flex; align-items:center; gap:5px;">
+                            <input type="number" class="sess-time-input" data-sid="${currentSessId}" value="${sessTime}" 
+                                   style="width:50px; padding:2px; border:none; border-radius:3px; text-align:center; font-weight:bold; color:#333;" 
+                                   oninput="syncFromSectional()"> Min
+                        </div>`;
+                    container.appendChild(separator);
+                }
+
+                // Render Subject Row
                 let row = document.createElement('div');
                 row.className = 'settings-row';
                 row.style.cssText = 'background:#fcfcfc; padding:8px 12px; border-radius:6px; border:1px solid #eee;';
+                if (physics === 'session-pool') row.style.borderLeft = "4px solid var(--cbt-purple)";
+
+                let isAuto = userMockSplitMode === 'auto';
+                let timeDisabled = isAuto || physics === 'session-pool' || physics === 'open';
                 
-                let timeInputHTML = isAuto 
-                    ? `<input type="number" id="sec-time-${sub}" class="settings-input" value="${userMockSecData[sub].time}" disabled style="background:#e9ecef; color:#888; border-color:#ccc;" title="Auto-Split Mode controls this">` 
+                let timeInputHTML = timeDisabled 
+                    ? `<input type="number" id="sec-time-${sub}" class="settings-input" value="${userMockSecData[sub].time}" disabled style="background:#e9ecef; color:#888; border-color:#ccc;" title="Controlled by Global/Session Timer">` 
                     : `<input type="number" id="sec-time-${sub}" class="settings-input" value="${userMockSecData[sub].time}" oninput="syncFromSectional()">`;
                 
                 row.innerHTML = `
                     <div style="font-weight:bold; color:var(--cbt-blue); flex:1;">${sub}</div>
                     <div class="aligned-input-grid">
-                        ${timeInputHTML}
-                        <span style="font-size:0.8rem; color:#888;">Min</span>
-                        <input type="number" id="sec-qs-${sub}" class="settings-input" value="${userMockSecData[sub].qs}" oninput="syncFromSectional()">
-                        <span style="font-size:0.8rem; color:#888;">Qs</span>
-                    </div>
-                `;
+                        ${timeInputHTML} <span style="font-size:0.8rem; color:#888;">Min</span>
+                        <input type="number" id="sec-qs-${sub}" class="settings-input" value="${userMockSecData[sub].qs}" oninput="syncFromSectional()"> <span style="font-size:0.8rem; color:#888;">Qs</span>
+                    </div>`;
                 container.appendChild(row);
+
+                // Increment Session Tracking
+                itemsInSess++;
+                if (bucketArray.length > 0 && itemsInSess >= bucketArray[currentSessId]) {
+                    currentSessId++;
+                    itemsInSess = 0;
+                }
             });
         }
 
