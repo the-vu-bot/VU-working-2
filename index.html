@@ -2992,23 +2992,15 @@
                 let correct = 0, wrong = 0, attempted = 0;
                 try {
                     payload = JSON.parse(test.Payload);
-                    payload.state.forEach((s, i) => {
-                        if(s.selected !== null) {
-                            attempted++;
-                            // Cross-reference with Master Bank to verify Correct/Wrong
-                            let q = masterBank.find(mq => mq.uid === payload.uids[i]);
-                            
-                            if(q) {
-                                // If question found in bank, use live logic
-                                if(s.selected === q.correct) correct++;
-                                else wrong++;
-                            } else {
-                                // FALLBACK: If bank isn't ready or UID changed, use the sheet accuracy
-                                if (parseFloat(test.Accuracy) === 100) correct++;
-                                else wrong++;
-                            }
-                        }
-                    });
+                    // 1. Calculate Attempted from the saved state
+                    payload.state.forEach(s => { if(s.selected !== null) attempted++; });
+
+                    // 2. NEW BULLETPROOF MATH: Derive Right/Wrong from Sheet Accuracy
+                    // This avoids the "Shuffled Index" bug entirely.
+                    let accPercent = parseFloat(test.Accuracy) || 0;
+                    correct = Math.round((accPercent / 100) * attempted);
+                    wrong = attempted - correct;
+                    
                 } catch(e) { console.error("Payload parse error", e); }
                 let totalQs = payload.uids ? payload.uids.length : 0;
 
@@ -3165,40 +3157,41 @@
        // --- PHASE 4: THE BOOM RE-HYDRATION LOGIC 💥 ---
         function rehydrateTest(index) {
             try {
-                // 1. Grab the compressed payload from the hidden textarea
                 const payloadString = document.getElementById(`payload-data-${index}`).value;
                 const payload = JSON.parse(payloadString);
 
-                // 2. Rebuild the Questions Array (The Time Machine)
-                // We match the saved UIDs to your current Master Bank to get the question text
-                questions = payload.uids.map(uid => masterBank.find(q => q.uid === uid)).filter(Boolean);
+                // Rebuild the Questions Array
+                questions = payload.uids.map((uid, i) => {
+                    let q = masterBank.find(mq => mq.uid === uid);
+                    if (q) {
+                        let qCopy = JSON.parse(JSON.stringify(q));
+                        // If we have a locked index from the test, use it!
+                        if (payload.correctIndices) {
+                            qCopy.correct = payload.correctIndices[i];
+                        }
+                        return qCopy;
+                    }
+                    return null;
+                }).filter(Boolean);
 
                 if (questions.length === 0) {
-                    alert("❌ Error: Could not match UIDs. Have you deleted these questions from your Master Bank?");
+                    alert("❌ Error: Could not match UIDs. Questions might be deleted.");
                     return;
                 }
 
-                // 3. Restore the precise test state and timers
                 state = payload.state;
                 mockBoundaries = payload.mockBoundaries;
                 timeSpentGlobal = payload.timeSpentGlobal;
                 
-                // Change the label so you know you are looking at an archived test
                 examType = 'VAULT ARCHIVE'; 
                 currentMode = 'analysis';
 
-                // 4. THE BOOM: Render the analytics and switch screens instantly
                 renderAnalyticsDisplay();
-                
                 document.getElementById('journey-screen').style.display = 'none';
                 document.getElementById('analysis-screen').style.display = 'flex';
-                
-                pushHistoryState('analysis'); // Track it!
-
-                console.log("💥 Test Rehydrated Successfully!");
+                pushHistoryState('analysis');
             } catch (error) {
-                console.error("Rehydration Error:", error);
-                alert("❌ Failed to rehydrate this test. The data payload might be corrupted.");
+                alert("❌ Failed to rehydrate this test.");
             }
         }
 
@@ -3256,6 +3249,8 @@
             let payloadObj = {
                 uids: questions.map(q => q.uid),
                 state: state,
+                // NEW: Lock the correct indices at the time of the test
+                correctIndices: questions.map(q => q.correct), 
                 mockBoundaries: mockBoundaries,
                 timeSpentGlobal: timeSpentGlobal
             };
