@@ -1599,8 +1599,11 @@
                 document.getElementById('default-lang-select').value = defaultLang;
                 document.getElementById('lang-select').value = currentLang;
 
-                if(examType === 'mock') document.getElementById('sectional-timer-wrapper').style.display = 'flex';
-                else document.getElementById('sectional-timer-wrapper').style.display = 'none';
+                if(examType === 'mock' && mockPhysicsMode !== 'open') {
+                    document.getElementById('sectional-timer-wrapper').style.display = 'flex';
+                } else {
+                    document.getElementById('sectional-timer-wrapper').style.display = 'none';
+                }
                 
                 buildPalette();
 
@@ -1819,7 +1822,11 @@
                 sectionalSeconds = mockBoundaries.length > 0 ? mockBoundaries[0].allocatedTime : 0; 
                 totalSeconds = mockBoundaries.reduce((sum, b) => sum + b.allocatedTime, 0); 
                 document.getElementById('cbt-title').innerHTML = `Full Mock <span style="font-size:0.8rem; color:#888;">(VU)</span>`;
-                document.getElementById('sectional-timer-wrapper').style.display = 'flex';
+                if (mockPhysicsMode === 'open') {
+                    document.getElementById('sectional-timer-wrapper').style.display = 'none';
+                } else {
+                    document.getElementById('sectional-timer-wrapper').style.display = 'flex';
+                }
             } else {
                 let filtered = [];
                 if (isCalcDrill) { 
@@ -1867,12 +1874,18 @@
                 
                 // 1. SESSION-AWARE VISUAL LOCKS
                 if(examType === 'mock' && currentMode === 'test') {
-                    let activeSessionId = mockBoundaries[activeSectionIndex].sessionId;
-                    let thisSessionId = sec.sessionId;
+                    if (mockPhysicsMode === 'subject-strict') {
+                        if (bIndex < activeSectionIndex) lockStatus = ' <span style="color:#888;">(Done)</span>';
+                        else if (bIndex > activeSectionIndex) lockStatus = ' <span style="color:#d9534f;">(Locked)</span>';
+                        else lockStatus = ' <span style="color:var(--cbt-green);">(Active)</span>';
+                    } else if (mockPhysicsMode === 'session-pool') {
+                        let activeSessionId = mockBoundaries[activeSectionIndex].sessionId;
+                        let thisSessionId = sec.sessionId;
 
-                    if (thisSessionId < activeSessionId) lockStatus = ' <span style="color:#888;">(Done)</span>';
-                    else if (thisSessionId > activeSessionId) lockStatus = ' <span style="color:#d9534f;">(Locked)</span>';
-                    else lockStatus = ' <span style="color:var(--cbt-green);">(Active)</span>';
+                        if (thisSessionId < activeSessionId) lockStatus = ' <span style="color:#888;">(Done)</span>';
+                        else if (thisSessionId > activeSessionId) lockStatus = ' <span style="color:#d9534f;">(Locked)</span>';
+                        else lockStatus = ' <span style="color:var(--cbt-green);">(Active)</span>';
+                    }
                 }
                 titleDiv.innerHTML = `<span>${sec.name.toUpperCase()}</span> ${lockStatus}`;
                 wrapper.appendChild(titleDiv);
@@ -2253,14 +2266,17 @@
                 
                 if(currentMode === 'test' || currentMode === 'practice') {
                     let isLocked = false;
-                    if(examType === 'mock') {
-                        let activeSessionId = mockBoundaries[activeSectionIndex].sessionId;
-                        // Determine which session this specific question (i) belongs to
+                    if(examType === 'mock' && mockPhysicsMode !== 'open') {
                         let qBoundary = mockBoundaries.find(b => i >= b.start && i <= b.end);
+                        let bIndex = mockBoundaries.indexOf(qBoundary);
                         
-                        // If it's a mock and NOT 'open' mode, lock it if the session IDs don't match
-                        if (mockPhysicsMode !== 'open' && qBoundary && qBoundary.sessionId !== activeSessionId) {
+                        if (mockPhysicsMode === 'subject-strict' && bIndex !== activeSectionIndex) {
                             isLocked = true;
+                        } else if (mockPhysicsMode === 'session-pool') {
+                            let activeSessionId = mockBoundaries[activeSectionIndex].sessionId;
+                            if (qBoundary && qBoundary.sessionId !== activeSessionId) {
+                                isLocked = true;
+                            }
                         }
                     }
 
