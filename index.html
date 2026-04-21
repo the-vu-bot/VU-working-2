@@ -1149,7 +1149,12 @@
             let physicsNode = document.querySelector('input[name="edit-preset-physics"]:checked');
             let physics = physicsNode ? physicsNode.value : 'open';
             
-            let buckets = document.getElementById('edit-preset-buckets').value.trim();
+            let bucketEl = document.getElementById('edit-preset-buckets');
+            let buckets = bucketEl ? bucketEl.value.trim() : '';
+
+            // Fallback to global defaults since manual boxes are gone
+            let time = userMockGlobalTime || 60;
+            let qs = userMockGlobalQs || 100;
 
             if (id) {
                 let idx = examPresets.findIndex(x => x.id === id);
@@ -1160,13 +1165,17 @@
                 }
             } else {
                 let newId = 'preset_' + Date.now();
-                examPresets.push({ id: newId, name, time: 60, qs: 100, physics, buckets });
+                examPresets.push({ id: newId, name, time: time, qs: qs, physics, buckets });
                 id = newId;
             }
 
             localStorage.setItem('vu_exam_presets', JSON.stringify(examPresets));
             closePresetEditor();
             applyMockPreset(id); 
+        }
+
+        function closePresetEditor() { 
+            document.getElementById('preset-editor-overlay').style.display = 'none'; 
         }
 
         function deleteActivePreset() {
@@ -1242,17 +1251,28 @@
         }
 
         function saveSettings() {
-            customSprintTime = parseInt(document.getElementById('set-sprint-time').value) || 15;
-            customSprintQs = parseInt(document.getElementById('set-sprint-qs').value) || 25;
-            customPracticeQs = parseInt(document.getElementById('set-practice-qs').value) || 50;
-            customCalcQs = parseInt(document.getElementById('set-calc-qs').value) || 50;
+            // 1. Grab values from UI
+            userSprintTime = parseInt(document.getElementById('set-sprint-time').value) || 15;
+            userSprintQs = parseInt(document.getElementById('set-sprint-qs').value) || 25;
+            userPracticeQs = parseInt(document.getElementById('set-practice-qs').value) || 50;
+            userCalcQs = parseInt(document.getElementById('set-calc-qs').value) || 50;
+            
+            let globalTimeEl = document.getElementById('set-mock-global-time');
+            let globalQsEl = document.getElementById('set-mock-global-qs');
+            if(globalTimeEl) userMockGlobalTime = parseInt(globalTimeEl.value) || 60;
+            if(globalQsEl) userMockGlobalQs = parseInt(globalQsEl.value) || 100;
 
-            localStorage.setItem('vu_sprint_time', customSprintTime);
-            localStorage.setItem('vu_sprint_qs', customSprintQs);
-            localStorage.setItem('vu_practice_qs', customPracticeQs);
-            localStorage.setItem('vu_calc_qs', customCalcQs);
+            // 2. Save to memory
+            localStorage.setItem('vu_sprint_time', userSprintTime);
+            localStorage.setItem('vu_sprint_qs', userSprintQs);
+            localStorage.setItem('vu_practice_qs', userPracticeQs);
+            localStorage.setItem('vu_calc_qs', userCalcQs);
+            localStorage.setItem('vu_mock_global_time', userMockGlobalTime);
+            localStorage.setItem('vu_mock_global_qs', userMockGlobalQs);
 
-            updateMockSecData(); // Keeps your mock timings synced
+            // 3. Trigger native math and close
+            if (typeof syncFromSectional === "function") syncFromSectional();
+            if (typeof updateDashboardDropdowns === "function") updateDashboardDropdowns();
             closeSettings();
         }
 
@@ -2656,20 +2676,20 @@
                     }
                 }
             }
-            // Global Backdrop Click Logic for Modals
+            
+            // --- MODAL BACKDROP CLICK LOGIC ---
             let settingsOverlay = document.getElementById('settings-overlay');
-            if (settingsOverlay && settingsOverlay.style.display === 'flex' && event.target === settingsOverlay) {
-                closeSettings();
-            }
+            if (settingsOverlay && settingsOverlay.style.display === 'flex' && event.target === settingsOverlay) closeSettings();
+            
             let summaryOverlay = document.getElementById('summary-overlay');
-            if (summaryOverlay && summaryOverlay.style.display === 'flex' && event.target === summaryOverlay) {
-                closeSummaryModal();
-            }
-            // Proforma Overlay Click-Outside
+            if (summaryOverlay && summaryOverlay.style.display === 'flex' && event.target === summaryOverlay) closeSummaryModal();
+            
             let proformaOverlay = document.getElementById('proforma-overlay');
-            if (proformaOverlay && proformaOverlay.style.display === 'flex' && event.target === proformaOverlay) {
-                closeProformaModal();
-            }
+            if (proformaOverlay && proformaOverlay.style.display === 'flex' && event.target === proformaOverlay) closeProformaModal();
+
+            // NEW: Exam Architect Click-to-Close
+            let presetOverlay = document.getElementById('preset-editor-overlay');
+            if (presetOverlay && presetOverlay.style.display === 'flex' && event.target === presetOverlay) closePresetEditor();
         });
 
         // --- PHASE 3: THE VU JOURNEY UI & FETCH LOGIC ---
