@@ -1019,9 +1019,8 @@
             }
         }
 
-        let mockPhysicsMode = 'open'; // The new 4-tier brain
+        let mockPhysicsMode = 'open'; 
 
-        // --- 1. THE CORE APPLY LOGIC ---
         function applyMockPreset(presetId) {
             activePresetId = presetId;
             localStorage.setItem('vu_active_preset', activePresetId);
@@ -1031,7 +1030,6 @@
             
             let statusEl = document.getElementById('mock-status-label');
             if(statusEl) {
-                // Backwards compatibility for older saved chips
                 mockPhysicsMode = preset.physics || (preset.locked ? 'subject-strict' : 'open'); 
                 
                 if (mockPhysicsMode === 'open') {
@@ -1043,20 +1041,16 @@
                 } else if (mockPhysicsMode === 'session-pool') {
                     statusEl.innerHTML = `📦 Navigation: Session Pool (Shared Time)`;
                     setSplitMode('custom');
-                } else if (mockPhysicsMode === 'session-strict') {
-                    statusEl.innerHTML = `⏱️ Navigation: Session Strict (Split Time)`;
-                    setSplitMode('custom');
                 }
             }
 
-            document.getElementById('set-mock-global-time').value = preset.time;
-            document.getElementById('set-mock-global-qs').value = preset.qs;
+            if (document.getElementById('set-mock-global-time')) document.getElementById('set-mock-global-time').value = preset.time || userMockGlobalTime;
+            if (document.getElementById('set-mock-global-qs')) document.getElementById('set-mock-global-qs').value = preset.qs || userMockGlobalQs;
             
             renderPresetChips(); 
-            syncFromGlobal(); 
+            if (typeof syncFromGlobal === 'function') syncFromGlobal(); 
         }
 
-        // --- 2. RENDER THE CHIPS (Kept perfectly intact!) ---
         function renderPresetChips() {
             const container = document.getElementById('dynamic-preset-chips');
             if(!container) return;
@@ -1087,25 +1081,6 @@
                 btn.appendChild(editSpan);
                 container.appendChild(btn);
             });
-        }
-
-        // --- 3. EDITOR MODAL CONTROLS (Updated for 3-Tier) ---
-        function togglePresetBucketUI() {
-            let physicsNode = document.querySelector('input[name="edit-preset-physics"]:checked');
-            let physics = physicsNode ? physicsNode.value : 'open';
-            let bucketInput = document.getElementById('edit-preset-buckets');
-            let bucketLabel = document.getElementById('bucket-config-area');
-            
-            if (physics === 'session-pool') {
-                bucketInput.disabled = false;
-                bucketInput.style.background = '#fff';
-                bucketLabel.style.opacity = '1';
-            } else {
-                bucketInput.disabled = true;
-                bucketInput.style.background = '#eee';
-                bucketInput.value = '';
-                bucketLabel.style.opacity = '0.5';
-            }
         }
 
         // --- EXAM ARCHITECT MODAL CONTROLS ---
