@@ -749,7 +749,9 @@
         const repoOwner = 'the-vu-bot';
         const repoName = 'VU-Vault';
 
-        // AUTHENTICATION (Upgraded for Private GitHub Repo)
+        // ==========================================
+        // 🔒 AUTHENTICATION & VAULT DECRYPTION
+        // ==========================================
         async function checkAuth() {
             const savedKey = localStorage.getItem('vu_unlocked_key');
             let token = localStorage.getItem(STORAGE_GITHUB_TOKEN);
@@ -785,13 +787,13 @@
             
             let token = localStorage.getItem(STORAGE_GITHUB_TOKEN);
             if (!token) {
-                token = prompt("Enter your GitHub PAT to access the Vault:");
+                token = prompt("Enter your GitHub PAT to connect to the Vault:");
                 if (!token) return;
                 localStorage.setItem(STORAGE_GITHUB_TOKEN, token);
             }
 
             const btn = document.getElementById('unlock-btn');
-            btn.innerText = "Verifying...";
+            btn.innerText = "Connecting to GitHub...";
             
             try {
                 const apiUrl = `https://api.github.com/repos/the-vu-bot/exam-engine-vu/contents/${input}.json`;
@@ -800,7 +802,12 @@
                 });
                 
                 if (!response.ok) { 
-                    alert("❌ Vault File not found! Check your filename and PAT."); 
+                    if (response.status === 401 || response.status === 403) {
+                        alert("❌ GitHub Access Denied! Your PAT might be expired or incorrect. Please enter it again.");
+                        localStorage.removeItem(STORAGE_GITHUB_TOKEN); // Delete the bad token
+                    } else {
+                        alert("❌ Vault File not found! Check if '" + input + ".json' exists in your repo.");
+                    }
                     btn.innerText = "Unlock Engine"; 
                     return; 
                 }
@@ -816,15 +823,18 @@
                     document.getElementById('home-screen').style.display = 'flex';
                 }
             } catch (e) { 
-                alert("Network error. Cannot connect to GitHub API."); 
+                alert("Network error. Your browser is blocking the connection."); 
             }
             btn.innerText = "Unlock Engine";
         }
 
         function lockEngine() {
-            localStorage.removeItem('vu_auth');
+            localStorage.removeItem('vu_unlocked_key');
+            localStorage.removeItem(STORAGE_SESSION);
             location.reload();
         }
+
+        document.getElementById("pin-input").addEventListener("keypress", (e) => { if (e.key === "Enter") verifyPin(); });
 
         async function initEngine() {
             try {
