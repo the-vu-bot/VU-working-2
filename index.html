@@ -749,30 +749,21 @@
         const repoOwner = 'the-vu-bot';
         const repoName = 'VU-Vault';
 
-        // --- AUTH & INIT (Secured for Private GitHub Repo) ---
         async function checkAuth() {
-            const savedKey = localStorage.getItem('vu_active_db');
-            const token = localStorage.getItem('vu_pat');
-            
-            if (savedKey && token) {
+            const savedKey = localStorage.getItem('vu_unlocked_key');
+            if(savedKey) {
                 try {
-                    const apiUrl = `https://api.github.com/repos/the-vu-bot/VU-Vault/contents/${savedKey}.json`;
-                    const response = await fetch(apiUrl, { 
-                        headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } 
-                    });
-                    
-                    if (response.ok) {
-                        const fileData = await response.json();
-                        // Decrypt the Base64 file from GitHub
-                        const jsonString = decodeURIComponent(escape(atob(fileData.content)));
-                        masterBank = JSON.parse(jsonString);
-                        
-                        document.getElementById('lock-screen').style.display = 'none';
-                        document.getElementById('home-screen').style.display = 'flex';
-                        initEngineOfflineBypass();
+                    const response = await fetch(savedKey + '.json?t=' + new Date().getTime());
+                    if(response.ok) {
+                        try { masterBank = await response.json(); } catch(e) { alert("⚠️ FORMAT ERROR"); return; }
+                        setupDashboard();
+                        if(!restoreSession()) {
+                            document.getElementById('lock-screen').style.display = 'none';
+                            document.getElementById('home-screen').style.display = 'flex';
+                        }
                         return;
                     }
-                } catch(e) { console.log("Auto-login failed:", e); }
+                } catch(e) {}
             }
             document.getElementById('lock-screen').style.display = 'flex';
             document.getElementById('home-screen').style.display = 'none';
@@ -780,48 +771,20 @@
 
         async function verifyPin() {
             const input = document.getElementById('pin-input').value.trim();
-            if (!input) return;
-            
-            let token = localStorage.getItem('vu_pat');
-            if (!token) {
-                token = prompt("Enter your GitHub PAT to connect to the Vault:");
-                if (!token) return;
-                localStorage.setItem('vu_pat', token);
-            }
-
+            if(!input) return;
             const btn = document.getElementById('unlock-btn');
-            btn.innerText = "Connecting to Vault...";
-            
+            btn.innerText = "Verifying...";
             try {
-                // Fetch directly from your VU-Vault repo
-                const apiUrl = `https://api.github.com/repos/the-vu-bot/VU-Vault/contents/${input}.json`;
-                const response = await fetch(apiUrl, { 
-                    headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } 
-                });
-                
-                if (!response.ok) { 
-                    if (response.status === 401 || response.status === 403 || response.status === 404) {
-                        alert("❌ Access Denied! Repo 'VU-Vault' not found, or your PAT is invalid.");
-                        localStorage.removeItem('vu_pat'); // Delete bad token to allow re-entry
-                    } else {
-                        alert(`❌ Vault File not found! Check if '${input}.json' exists in your repo.`);
-                    }
-                    btn.innerText = "Unlock Engine"; 
-                    return; 
+                const response = await fetch(input + '.json?t=' + new Date().getTime());
+                if (!response.ok) { alert("❌ File not found!"); btn.innerText = "Unlock Engine"; return; }
+                masterBank = await response.json();
+                localStorage.setItem('vu_unlocked_key', input);
+                setupDashboard();
+                if(!restoreSession()) {
+                    document.getElementById('lock-screen').style.display = 'none';
+                    document.getElementById('home-screen').style.display = 'flex';
                 }
-                
-                const fileData = await response.json();
-                const jsonString = decodeURIComponent(escape(atob(fileData.content)));
-                masterBank = JSON.parse(jsonString);
-                
-                localStorage.setItem('vu_active_db', input);
-                
-                document.getElementById('lock-screen').style.display = 'none';
-                document.getElementById('home-screen').style.display = 'flex';
-                initEngineOfflineBypass();
-            } catch (e) { 
-                alert("Network error. Cannot connect to GitHub API."); 
-            }
+            } catch (e) { alert("Network error. Cannot fetch file."); }
             btn.innerText = "Unlock Engine";
         }
 
