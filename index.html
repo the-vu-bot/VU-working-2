@@ -888,6 +888,29 @@
         const STORAGE_IMAGES = 'VU_IMAGE_SOLUTIONS';
         const STORAGE_GITHUB_TOKEN = 'VU_GITHUB_TOKEN';
         const STORAGE_TIME = 'VU_ENGINE_TIME_MAP';
+
+        function renderJourneyHeatmap() {
+            const container = document.getElementById('journey-heatmap');
+            if(!container) return;
+            
+            let activityMap = {};
+            cachedJourneyData.forEach(d => {
+                let dateKey = d.Timestamp.split('T')[0];
+                activityMap[dateKey] = (activityMap[dateKey] || 0) + 1;
+            });
+
+            let html = '';
+            let today = new Date();
+            // Show last 60 days
+            for(let i = 60; i >= 0; i--) {
+                let d = new Date(); d.setDate(today.getDate() - i);
+                let key = d.toISOString().split('T')[0];
+                let count = activityMap[key] || 0;
+                let color = count === 0 ? '#eee' : (count === 1 ? '#c6e48b' : (count < 3 ? '#7bc96f' : '#239a3b'));
+                html += `<div style="width:12px; height:12px; background:${color}; border-radius:2px; flex-shrink:0;" title="${key}: ${count} tests"></div>`;
+            }
+            container.innerHTML = html;
+        }
         
         // --- PHASE 2 & 3: EXPANDED MODAL FUNCTIONS ---
         function openSettings() {
@@ -2840,6 +2863,48 @@
             if (presetOverlay && presetOverlay.style.display === 'flex' && event.target === presetOverlay) closePresetEditor();
         });
 
+        function exportVaultToCSV() {
+            if (!cachedJourneyData || cachedJourneyData.length === 0) { alert("No data to export!"); return; }
+            
+            // 1. Identify all unique subjects in the entire vault
+            let allSubjects = new Set();
+            cachedJourneyData.forEach(d => {
+                Object.keys(d).forEach(k => { if(k.endsWith('_Score')) allSubjects.add(k.replace('_Score', '')); });
+            });
+            let sortedSubs = Array.from(allSubjects).sort();
+
+            // 2. Build Headers
+            let headers = ['Timestamp', 'Exam_Type', 'Total_Score', 'Accuracy_%', 'Time_Mins'];
+            sortedSubs.forEach(s => { headers.push(`${s}_Score`, `${s}_Acc`, `${s}_Time_Secs`); });
+            
+            let csvRows = [headers.join(',')];
+
+            // 3. Build Rows
+            cachedJourneyData.forEach(d => {
+                let row = [
+                    `"${d.Timestamp}"`,
+                    `"${d.ExamType}"`,
+                    d.Score,
+                    d.Accuracy,
+                    (d.TimeSpent / 60).toFixed(1)
+                ];
+                sortedSubs.forEach(s => {
+                    row.push(d[`${s}_Score`] || 0);
+                    row.push(d[`${s}_Acc`] || 0);
+                    row.push(d[`${s}_Time`] || 0);
+                });
+                csvRows.push(row.join(','));
+            });
+
+            // 4. Trigger Download
+            let blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+            let url = window.URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `VU_Vault_Backup_${new Date().toLocaleDateString()}.csv`;
+            a.click();
+        }
+
         // --- PHASE 3: THE VU JOURNEY UI & FETCH LOGIC ---
         function openJourneyPage() {
             currentMode = 'journey';
@@ -2897,6 +2962,7 @@
             });
 
             renderJourneyFeed(filtered);
+            setTimeout(renderJourneyHeatmap, 50);
         }
 
         function renderSlicer() {
@@ -2915,6 +2981,7 @@
                 <select id="j-filter-sub" class="filter-chip" style="margin:0; width:auto; ${journeyFilterType==='mock'?'display:none;':''}" onchange="updateJourneyFilters()">
                     ${subOptions.replace(`value="${journeyFilterSubject}"`, `value="${journeyFilterSubject}" selected`)}
                 </select>
+                <button class="btn btn-outline" style="border-radius:20px; font-size:0.8rem; padding:4px 12px; border-color:var(--cbt-green); color:var(--cbt-green); white-space:nowrap; margin-left:10px;" onclick="exportVaultToCSV()">📥 Export CSV</button>
             </div>`;
         }
 
@@ -2952,11 +3019,13 @@
 
         function renderJourneyFeed(data) {
             const container = document.getElementById('journey-feed-area');
-            
-            // 1. Render Main Filters
-            let html = renderSlicer();
-            
-            // 2. Render Deep Dive Panel
+
+            let html = `<div class="dashboard-card" style="max-width: 100%; padding: 15px; margin-bottom: 20px; overflow-x: auto; border-top-color: var(--cbt-purple);">
+                            <h4 style="margin:0 0 10px 0; color:var(--cbt-purple); text-align:center; font-size:0.9rem;">Consistency Heatmap (Last 60 Days)</h4>
+                            <div id="journey-heatmap" style="display:flex; gap:3px; justify-content:center;"></div>
+                         </div>`;
+            // 2. Add the Slicer (Filters) and Deep Dive below it
+            html += renderSlicer();
             html += renderDeepDiveSlicer();
 
             if (!data || data.length === 0) {
@@ -3053,15 +3122,21 @@
             };
 
             let validData = chartData.filter(d => extractVal(d) !== null);
-            
             if(validData.length < 2) {
                 return `<div id="${boxId}" style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; border: 1px solid #eee; display: ${displayStyle}; align-items: center; justify-content: center; text-align:center; color:#888;">Not enough data for<br>${title}</div>`;
             }
 
-            let maxVal = Math.max(...validData.map(d => extractVal(d)), 10);
-            let minVal = Math.min(...validData.map(d => extractVal(d)), 0);
+            // Calculate Mean for the Average Line
+            let sum = validData.reduce((s, d) => s + extractVal(d), 0);
+            let avgVal = parseFloat((sum / validData.length).toFixed(1));
+
+            let maxVal = Math.max(...validData.map(d => extractVal(d)), 10, avgVal);
+            let minVal = Math.min(...validData.map(d => extractVal(d)), 0, avgVal);
             let width = 300; let height = 120; let padding = 20;
             let pX = (width - padding*2) / Math.max(validData.length - 1, 1);
+
+            // Calculate Y-coordinate for the Average Line
+            let avgY = height - padding - ((avgVal - minVal) / (maxVal - minVal || 1)) * (height - padding*2);
 
             let points = validData.map((d, i) => {
                 let val = extractVal(d);
@@ -3072,15 +3147,16 @@
             let circles = validData.map((d, i) => {
                 let x = padding + (i * pX); let val = extractVal(d);
                 let y = height - padding - ((val - minVal) / (maxVal - minVal || 1)) * (height - padding*2);
-                return `<circle cx="${x}" cy="${y}" r="4" fill="${color}" stroke="white" stroke-width="1.5"/>
-                        <text x="${x}" y="${y-10}" font-size="10" font-weight="bold" fill="#555" text-anchor="middle">${val}</text>`;
+                return `<circle cx="${x}" cy="${y}" r="3" fill="${color}" stroke="white" stroke-width="1"/>`;
             }).join('');
 
             return `
-            <div id="${boxId}" style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #eee; display: ${displayStyle};">
-                <h4 style="margin:0 0 10px 0; color:#333; text-align:center; font-size: 0.95rem;">${title}</h4>
+            <div id="${boxId}" style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #eee; display: ${displayStyle}; position:relative;">
+                <h4 style="margin:0 0 10px 0; color:#333; text-align:center; font-size: 0.85rem;">${title}</h4>
+                <div style="position:absolute; top:35px; right:15px; font-size:0.65rem; font-weight:bold; color:var(--cbt-red);">Avg: ${avgVal}</div>
                 <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
                     <line x1="${padding}" y1="${height-padding}" x2="${width-padding}" y2="${height-padding}" stroke="#eee" stroke-width="2" />
+                    <line x1="${padding}" y1="${avgY}" x2="${width-padding}" y2="${avgY}" stroke="var(--cbt-red)" stroke-width="1.5" stroke-dasharray="4" opacity="0.6" />
                     <polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${points}" />
                     ${circles}
                 </svg>
