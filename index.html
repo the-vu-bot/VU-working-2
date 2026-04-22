@@ -1400,7 +1400,7 @@
                     if (data.images) localStorage.setItem(STORAGE_IMAGES, JSON.stringify(data.images));
                     if (data.timeMap) {
                         let localTimeMap = JSON.parse(localStorage.getItem(STORAGE_TIME) || '{}');
-                        for(let uid in data.timeMap) { localTimeMap[uid] = Math.max(localTimeMap[uid] || 0, data.timeMap[uid]); }
+                        for(let uid in data.timeMap) { localTimeMap[uid] = Math.round(((localTimeMap[uid] || data.timeMap[uid]) + data.timeMap[uid]) / 2); }
                         localStorage.setItem(STORAGE_TIME, JSON.stringify(localTimeMap));
                     }
                     if (data.settings) {
@@ -2434,11 +2434,11 @@
                 }
             });
             
-            localStorage.setItem(STORAGE_SEEN, JSON.stringify(seen.slice(-500))); 
+            localStorage.setItem(STORAGE_SEEN, JSON.stringify(seen));
             localStorage.setItem(STORAGE_WRONG, JSON.stringify(wrongMap));
             localStorage.setItem(STORAGE_TIME, JSON.stringify(timeMap));
 
-            renderAnalyticsDisplay(); showDashboard(); saveTestState(); 
+            renderAnalyticsDisplay(); showDashboard(); saveTestState();
             
             document.querySelector('.floating-gear').style.display = 'flex'; // Show gear after test
             renderAnalyticsDisplay(); showDashboard(); saveTestState(); 
