@@ -946,6 +946,9 @@
                 
                 html += `<div class="heatmap-cell" style="background:${color};" title="${key}: ${count} Tests"></div>`;
             }
+            
+            // KILL THE OLD INLINE FLEX STYLE SO GRID CAN WORK
+            container.style.cssText = 'margin: 0 auto;'; 
             container.className = 'heatmap-grid';
             container.innerHTML = html;
         }
@@ -3015,8 +3018,8 @@
 
             return `
             <div style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
-                <div class="scrollable-filter-bar">
-                    <span class="fixed-filter-title" style="color: var(--cbt-blue);">Vault Filters:</span>
+                <strong style="width: 100%; text-align: center; color: var(--cbt-blue); font-size: 0.95rem; margin-bottom: 10px;">Vault Filters</strong>
+                <div class="scrollable-filter-bar" style="justify-content: center;">
                     <select id="j-filter-type" class="filter-chip" style="margin:0; width:auto; flex-shrink: 0;" onchange="updateJourneyFilters()">
                         <option value="all" ${journeyFilterType==='all'?'selected':''}>All Modes</option>
                         <option value="mock" ${journeyFilterType==='mock'?'selected':''}>Full Mocks</option>
@@ -3059,8 +3062,8 @@
 
             let html = `
             <div style="background: white; padding: 12px 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
-                <div class="scrollable-filter-bar">
-                    <span class="fixed-filter-title" style="color: var(--cbt-purple);">Deep-Dive:</span>`;
+                <strong style="width: 100%; text-align: center; color: var(--cbt-purple); font-size: 0.95rem; margin-bottom: 10px;">Subject Deep-Dive</strong>
+                <div class="scrollable-filter-bar" style="justify-content: center;">`;
             
             sortedSubjects.forEach(sub => {
                 html += `<button class="filter-chip ${activeMockSubject===sub?'active':''}" style="flex-shrink: 0;" onclick="switchMockSubject('${sub}')">${sub}</button>`;
@@ -3091,20 +3094,22 @@
             
             // Timeline Limits and Metric Toggles
             html += `
-            <div class="scrollable-filter-bar" style="margin-bottom: 15px; background:#f4f8fb; padding:8px; border-radius:12px;">
-                <span style="font-size:0.8rem; font-weight:bold; color:#d9a05b; margin-right:5px; flex-shrink:0;">Timeline:</span>
-                <button class="filter-chip ${journeyChartLimit===7?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(7)">7 Days</button>
-                <button class="filter-chip ${journeyChartLimit===15?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(15)">15 Days</button>
-                <button class="filter-chip ${journeyChartLimit===30?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(30)">30 Days</button>
-                <button class="filter-chip ${journeyChartLimit===45?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(45)">45 Days</button>
-                <button class="filter-chip ${journeyChartLimit==='all'?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit('all')">All</button>
-                
-                <span style="border-left: 2px solid #ccc; height: 20px; margin: 0 5px; flex-shrink:0;"></span>
-                
-                <button class="filter-chip ${currentChartMode === 'all' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('all', this)">📊 All Metrics</button>
-                <button class="filter-chip ${currentChartMode === 'score' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('score', this)">🏆 Score</button>
-                <button class="filter-chip ${currentChartMode === 'acc' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('acc', this)">🎯 Acc (%)</button>
-                <button class="filter-chip ${currentChartMode === 'time' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('time', this)">⏱️ Time</button>
+            <div style="margin-bottom: 15px; background:#f4f8fb; padding:12px; border-radius:12px; display: flex; flex-direction: column;">
+                <strong style="width: 100%; text-align: center; color: #d9a05b; font-size: 0.95rem; margin-bottom: 10px;">Timeline & Metrics</strong>
+                <div class="scrollable-filter-bar" style="justify-content: center;">
+                    <button class="filter-chip ${journeyChartLimit===7?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(7)">7 Days</button>
+                    <button class="filter-chip ${journeyChartLimit===15?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(15)">15 Days</button>
+                    <button class="filter-chip ${journeyChartLimit===30?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(30)">30 Days</button>
+                    <button class="filter-chip ${journeyChartLimit===45?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(45)">45 Days</button>
+                    <button class="filter-chip ${journeyChartLimit==='all'?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit('all')">All</button>
+                    
+                    <span style="border-left: 2px solid #ccc; height: 20px; margin: 0 5px; flex-shrink:0;"></span>
+                    
+                    <button class="filter-chip ${currentChartMode === 'all' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('all', this)">📊 All Metrics</button>
+                    <button class="filter-chip ${currentChartMode === 'score' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('score', this)">🏆 Score</button>
+                    <button class="filter-chip ${currentChartMode === 'acc' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('acc', this)">🎯 Acc (%)</button>
+                    <button class="filter-chip ${currentChartMode === 'time' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('time', this)">⏱️ Time</button>
+                </div>
             </div>
             `;
 
