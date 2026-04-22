@@ -3104,7 +3104,7 @@
             // Timeline Limits and Metric Toggles (Stacked Layout)
             html += `
             <div style="margin-bottom: 15px; background:#f4f8fb; padding:12px; border-radius:12px; display: flex; flex-direction: column; gap: 5px;">
-                <strong style="width: 100%; text-align: center; color: #d9a05b; font-size: 0.95rem; margin-bottom: 5px;">Timeline & Metrics</strong>
+                <strong style="width: 100%; text-align: left; color: #d9a05b; font-size: 0.95rem; margin-bottom: 5px;">Timeline & Metrics</strong>
                 
                 <div class="scrollable-filter-bar" style="padding-bottom: 5px; border-bottom: 1px dashed #ddd;">
                     <button class="filter-chip journey-chart-btn ${currentChartMode === 'all' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('all', this)">📊 All Metrics</button>
@@ -3114,7 +3114,6 @@
                 </div>
 
                 <div class="scrollable-filter-bar" style="padding-top: 5px;">
-                    <span style="font-size:0.8rem; font-weight:bold; color:#888; margin-right:5px; flex-shrink:0;">History:</span>
                     <button class="filter-chip ${journeyChartLimit===7?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(7)">7 Days</button>
                     <button class="filter-chip ${journeyChartLimit===15?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(15)">15 Days</button>
                     <button class="filter-chip ${journeyChartLimit===30?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(30)">30 Days</button>
