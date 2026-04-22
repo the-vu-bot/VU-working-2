@@ -347,6 +347,33 @@
         /* The Pixel-Perfect Alignment Fix */
         .settings-input { width: 100%; padding: 5px; border: 1px solid var(--border); border-radius: 4px; text-align: center; font-weight: bold;}
         .aligned-input-grid { display: grid; grid-template-columns: 45px 25px 45px 20px; gap: 5px; align-items: center; text-align: left; }
+
+        /* 147-Day Heatmap Grid */
+        .heatmap-grid { 
+            display: grid; 
+            grid-template-rows: repeat(7, 12px); 
+            grid-auto-columns: 12px;
+            grid-auto-flow: column; 
+            gap: 3px; 
+            justify-content: flex-start; 
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+        .heatmap-cell { 
+            width: 12px; height: 12px; border-radius: 2px; 
+            cursor: crosshair; transition: transform 0.1s;
+        }
+        .heatmap-cell:hover { transform: scale(1.3); z-index: 10; box-shadow: 0 0 4px rgba(0,0,0,0.3); }
+
+        /* Scrollable Filter Bars */
+        .scrollable-filter-bar {
+            display: flex; gap: 8px; overflow-x: auto; white-space: nowrap; 
+            padding: 5px 0; align-items: center; width: 100%;
+        }
+        .scrollable-filter-bar::-webkit-scrollbar { height: 0px; display: none; } /* Clean look */
+        .fixed-filter-title {
+            position: sticky; left: 0; background: white; padding-right: 10px; z-index: 2; font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -822,6 +849,9 @@
     <script>
         // GLOBAL VARIABLES
         const JOURNEY_API_URL = "https://script.google.com/macros/s/AKfycbx4y8S2YtrEuzp2ZV_a83rmy5OVHf54QeaXXd3K5s4ZiFhotmWSzqjsn2809fwx4oaP/exec"; // <-- PASTE YOUR URL HERE
+
+        let journeyChartLimit = 15; // Default Timeline Limit
+        
         // --- NEW VAULT MEMORY VARIABLES ---
         let cachedJourneyData = [];
         let journeyFilterType = 'all';
@@ -901,15 +931,28 @@
 
             let html = '';
             let today = new Date();
-            // Show last 60 days
-            for(let i = 60; i >= 0; i--) {
+            // Generate 147 cells (21 weeks * 7 days)
+            for(let i = 146; i >= 0; i--) {
                 let d = new Date(); d.setDate(today.getDate() - i);
                 let key = d.toISOString().split('T')[0];
                 let count = activityMap[key] || 0;
-                let color = count === 0 ? '#eee' : (count === 1 ? '#c6e48b' : (count < 3 ? '#7bc96f' : '#239a3b'));
-                html += `<div style="width:12px; height:12px; background:${color}; border-radius:2px; flex-shrink:0;" title="${key}: ${count} tests"></div>`;
+                
+                // Color Logic based on Tests Per Day
+                let color = '#555555'; // Dark Gray (0)
+                if (count === 1 || count === 2) color = '#ff9999'; // Light Red
+                else if (count === 3) color = '#ffeb3b'; // Yellow
+                else if (count === 4) color = '#99cc99'; // Light Green
+                else if (count >= 5) color = '#388e3c'; // Dark Green
+                
+                html += `<div class="heatmap-cell" style="background:${color};" title="${key}: ${count} Tests"></div>`;
             }
+            container.className = 'heatmap-grid';
             container.innerHTML = html;
+        }
+        
+        function setJourneyLimit(limit) {
+            journeyChartLimit = limit;
+            renderJourneyDashboard();
         }
         
         // --- PHASE 2 & 3: EXPANDED MODAL FUNCTIONS ---
@@ -2971,17 +3014,19 @@
             subjects.forEach(s => subOptions += `<option value="${s}">${s}</option>`);
 
             return `
-            <div style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;">
-                <strong style="color: var(--cbt-blue);">Vault Filters:</strong>
-                <select id="j-filter-type" class="filter-chip" style="margin:0; width:auto;" onchange="updateJourneyFilters()">
-                    <option value="all" ${journeyFilterType==='all'?'selected':''}>All Modes</option>
-                    <option value="mock" ${journeyFilterType==='mock'?'selected':''}>Full Mocks</option>
-                    <option value="sprint" ${journeyFilterType==='sprint'?'selected':''}>Sectional Sprints</option>
-                </select>
-                <select id="j-filter-sub" class="filter-chip" style="margin:0; width:auto; ${journeyFilterType==='mock'?'display:none;':''}" onchange="updateJourneyFilters()">
-                    ${subOptions.replace(`value="${journeyFilterSubject}"`, `value="${journeyFilterSubject}" selected`)}
-                </select>
-                <button class="btn btn-outline" style="border-radius:20px; font-size:0.8rem; padding:4px 12px; border-color:var(--cbt-green); color:var(--cbt-green); white-space:nowrap; margin-left:10px;" onclick="exportVaultToCSV()">📥 Export CSV</button>
+            <div style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
+                <div class="scrollable-filter-bar">
+                    <span class="fixed-filter-title" style="color: var(--cbt-blue);">Vault Filters:</span>
+                    <select id="j-filter-type" class="filter-chip" style="margin:0; width:auto; flex-shrink: 0;" onchange="updateJourneyFilters()">
+                        <option value="all" ${journeyFilterType==='all'?'selected':''}>All Modes</option>
+                        <option value="mock" ${journeyFilterType==='mock'?'selected':''}>Full Mocks</option>
+                        <option value="sprint" ${journeyFilterType==='sprint'?'selected':''}>Sectional Sprints</option>
+                    </select>
+                    <select id="j-filter-sub" class="filter-chip" style="margin:0; width:auto; flex-shrink: 0; ${journeyFilterType==='mock'?'display:none;':''}" onchange="updateJourneyFilters()">
+                        ${subOptions.replace(`value="${journeyFilterSubject}"`, `value="${journeyFilterSubject}" selected`)}
+                    </select>
+                    <button class="btn btn-outline" style="border-radius:20px; font-size:0.8rem; padding:4px 12px; border-color:var(--cbt-green); color:var(--cbt-green); flex-shrink: 0;" onclick="exportVaultToCSV()">📥 Export CSV</button>
+                </div>
             </div>`;
         }
 
@@ -3006,14 +3051,21 @@
 
             if (availableSubjects.size === 0) return '';
 
-            let html = `<div style="display:flex; justify-content:center; gap:8px; margin-bottom:20px; flex-wrap:wrap; background: white; padding: 12px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                <strong style="width: 100%; text-align: center; color: var(--cbt-purple); font-size: 0.9rem; margin-bottom: 5px;">Subject Deep-Dive</strong>
-                <button class="filter-chip ${activeMockSubject==='Overall'?'active':''}" onclick="switchMockSubject('Overall')">Overall</button>`;
+            // Hardcoded Sorting Logic: Overall -> Main Subjects -> Calc Subjects -> Others
+            let sortedSubjects = ['Overall'];
+            globalActiveSubjects.forEach(s => { if(availableSubjects.has(s)) sortedSubjects.push(s); });
+            globalCalcSubjects.forEach(s => { if(availableSubjects.has(s)) sortedSubjects.push(s); });
+            availableSubjects.forEach(s => { if(!sortedSubjects.includes(s)) sortedSubjects.push(s); });
+
+            let html = `
+            <div style="background: white; padding: 12px 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
+                <div class="scrollable-filter-bar">
+                    <span class="fixed-filter-title" style="color: var(--cbt-purple);">Deep-Dive:</span>`;
             
-            availableSubjects.forEach(sub => {
-                html += `<button class="filter-chip ${activeMockSubject===sub?'active':''}" onclick="switchMockSubject('${sub}')">${sub}</button>`;
+            sortedSubjects.forEach(sub => {
+                html += `<button class="filter-chip ${activeMockSubject===sub?'active':''}" style="flex-shrink: 0;" onclick="switchMockSubject('${sub}')">${sub}</button>`;
             });
-            html += `</div>`;
+            html += `</div></div>`;
             return html;
         }
 
@@ -3037,18 +3089,22 @@
             // 3. Render "Showing X Tests" card
             html += `<div class="dashboard-card" style="max-width: 100%; padding: 15px; margin-bottom: 20px; text-align: center;"><h3 style="margin: 0; color: var(--cbt-purple);">Showing: ${data.length} Tests</h3></div>`;
             
-            // NEW: The Analytics Toggle Bar
-            let btnStyleAll = currentChartMode === 'all' ? `background: var(--cbt-purple); color: white; border-color: var(--cbt-purple);` : `background: white; color: #555; border-color: #ccc;`;
-            let btnStyleScore = currentChartMode === 'score' ? `background: var(--cbt-purple); color: white; border-color: var(--cbt-purple);` : `background: white; color: #555; border-color: #ccc;`;
-            let btnStyleAcc = currentChartMode === 'acc' ? `background: var(--cbt-purple); color: white; border-color: var(--cbt-purple);` : `background: white; color: #555; border-color: #ccc;`;
-            let btnStyleTime = currentChartMode === 'time' ? `background: var(--cbt-purple); color: white; border-color: var(--cbt-purple);` : `background: white; color: #555; border-color: #ccc;`;
-
+            // Timeline Limits and Metric Toggles
             html += `
-            <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
-                <button class="btn btn-outline journey-chart-btn" style="border-radius: 20px; padding: 6px 16px; font-weight:bold; ${btnStyleAll}" onclick="switchJourneyChart('all', this)">📊 All Metrics</button>
-                <button class="btn btn-outline journey-chart-btn" style="border-radius: 20px; padding: 6px 16px; font-weight:bold; ${btnStyleScore}" onclick="switchJourneyChart('score', this)">🏆 Score</button>
-                <button class="btn btn-outline journey-chart-btn" style="border-radius: 20px; padding: 6px 16px; font-weight:bold; ${btnStyleAcc}" onclick="switchJourneyChart('acc', this)">🎯 Acc (%)</button>
-                <button class="btn btn-outline journey-chart-btn" style="border-radius: 20px; padding: 6px 16px; font-weight:bold; ${btnStyleTime}" onclick="switchJourneyChart('time', this)">⏱️ Time (m)</button>
+            <div class="scrollable-filter-bar" style="margin-bottom: 15px; background:#f4f8fb; padding:8px; border-radius:12px;">
+                <span style="font-size:0.8rem; font-weight:bold; color:#d9a05b; margin-right:5px; flex-shrink:0;">Timeline:</span>
+                <button class="filter-chip ${journeyChartLimit===7?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(7)">7 Days</button>
+                <button class="filter-chip ${journeyChartLimit===15?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(15)">15 Days</button>
+                <button class="filter-chip ${journeyChartLimit===30?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(30)">30 Days</button>
+                <button class="filter-chip ${journeyChartLimit===45?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(45)">45 Days</button>
+                <button class="filter-chip ${journeyChartLimit==='all'?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit('all')">All</button>
+                
+                <span style="border-left: 2px solid #ccc; height: 20px; margin: 0 5px; flex-shrink:0;"></span>
+                
+                <button class="filter-chip ${currentChartMode === 'all' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('all', this)">📊 All Metrics</button>
+                <button class="filter-chip ${currentChartMode === 'score' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('score', this)">🏆 Score</button>
+                <button class="filter-chip ${currentChartMode === 'acc' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('acc', this)">🎯 Acc (%)</button>
+                <button class="filter-chip ${currentChartMode === 'time' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('time', this)">⏱️ Time</button>
             </div>
             `;
 
@@ -3113,7 +3169,7 @@
             renderJourneyDashboard();
         }
 
-        function createSingleSVG(chartData, key, title, color, boxId, isVisible) {
+        function createSingleSVG(fullData, key, title, color, boxId, isVisible) {
             let displayStyle = isVisible ? 'block' : 'none';
             let extractVal = (d) => {
                 if(d[key] === undefined || d[key] === null || d[key] === '') return null; 
@@ -3121,42 +3177,79 @@
                 return parseFloat(d[key]);
             };
 
-            let validData = chartData.filter(d => extractVal(d) !== null);
-            if(validData.length < 2) {
-                return `<div id="${boxId}" style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; border: 1px solid #eee; display: ${displayStyle}; align-items: center; justify-content: center; text-align:center; color:#888;">Not enough data for<br>${title}</div>`;
-            }
+            // 1. Date Timeline Filter
+            let cutoffDate = new Date();
+            if (journeyChartLimit !== 'all') cutoffDate.setDate(cutoffDate.getDate() - journeyChartLimit);
+            
+            let validData = fullData.filter(d => {
+                let dDate = new Date(d.Timestamp);
+                return extractVal(d) !== null && (journeyChartLimit === 'all' || dDate >= cutoffDate);
+            });
 
-            // Calculate Mean for the Average Line
-            let sum = validData.reduce((s, d) => s + extractVal(d), 0);
-            let avgVal = parseFloat((sum / validData.length).toFixed(1));
+            if(validData.length < 2) return `<div id="${boxId}" style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; border: 1px solid #eee; display: ${displayStyle}; align-items: center; justify-content: center; text-align:center; color:#888;">Not enough data for ${title} in this timeline.</div>`;
 
-            let maxVal = Math.max(...validData.map(d => extractVal(d)), 10, avgVal);
-            let minVal = Math.min(...validData.map(d => extractVal(d)), 0, avgVal);
-            let width = 300; let height = 120; let padding = 20;
-            let pX = (width - padding*2) / Math.max(validData.length - 1, 1);
+            // 2. Math calculations
+            let vals = validData.map(d => extractVal(d));
+            let avgVal = parseFloat((vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1));
+            let sortedVals = [...vals].sort((a,b) => a - b);
+            let medVal = sortedVals[Math.floor(sortedVals.length / 2)];
 
-            // Calculate Y-coordinate for the Average Line
-            let avgY = height - padding - ((avgVal - minVal) / (maxVal - minVal || 1)) * (height - padding*2);
+            let maxVal = Math.max(...vals, avgVal, medVal);
+            let minVal = Math.min(...vals, avgVal, medVal) > 0 ? 0 : Math.min(...vals, avgVal, medVal); // Floor at 0 for visual grounding
+            let range = maxVal - minVal || 1;
+            
+            // 3. Grid Coordinates
+            let width = 350; let height = 140; let padY = 20; let padXLeft = 35; let padXRight = 15;
+            let drawW = width - padXLeft - padXRight;
+            let drawH = height - padY * 2;
+            let pX = drawW / Math.max(validData.length - 1, 1);
+            let getY = (val) => height - padY - ((val - minVal) / range) * drawH;
 
-            let points = validData.map((d, i) => {
-                let val = extractVal(d);
-                let y = height - padding - ((val - minVal) / (maxVal - minVal || 1)) * (height - padding*2);
-                return `${padding + (i * pX)},${y}`;
+            // 4. Lines Data
+            let avgY = getY(avgVal);
+            let medY = getY(medVal);
+            let points = validData.map((d, i) => `${padXLeft + (i * pX)},${getY(vals[i])}`).join(' ');
+            
+            // Rolling Average (Last 5 Tests)
+            let rollPoints = validData.map((d, i) => {
+                let start = Math.max(0, i - 4);
+                let slice = vals.slice(start, i + 1);
+                let rollAvg = slice.reduce((s,v)=>s+v,0) / slice.length;
+                return `${padXLeft + (i * pX)},${getY(rollAvg)}`;
             }).join(' ');
 
+            // Tooltip Circles (CSS Hover logic embedded in <g> tag)
             let circles = validData.map((d, i) => {
-                let x = padding + (i * pX); let val = extractVal(d);
-                let y = height - padding - ((val - minVal) / (maxVal - minVal || 1)) * (height - padding*2);
-                return `<circle cx="${x}" cy="${y}" r="3" fill="${color}" stroke="white" stroke-width="1"/>`;
+                let x = padXLeft + (i * pX); let y = getY(vals[i]);
+                let dStr = new Date(d.Timestamp).toLocaleDateString('en-IN', {month:'short', day:'numeric'});
+                return `<g><circle cx="${x}" cy="${y}" r="4" fill="${color}" stroke="white" stroke-width="1.5" /><title>${dStr}\nValue: ${vals[i]}</title></g>`;
             }).join('');
+
+            // Smart Label Collision Logic (keeps Avg and Med labels from overlapping)
+            let avgLabelY = avgY < 30 ? avgY + 12 : avgY - 5;
+            let medLabelY = medY < 30 ? medY + 12 : medY - 5;
+            if (Math.abs(avgLabelY - medLabelY) < 12) {
+                if (avgY < medY) medLabelY += 12; else avgLabelY += 12; // Push them apart
+            }
 
             return `
             <div id="${boxId}" style="flex: 1; min-width: 250px; background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #eee; display: ${displayStyle}; position:relative;">
-                <h4 style="margin:0 0 10px 0; color:#333; text-align:center; font-size: 0.85rem;">${title}</h4>
-                <div style="position:absolute; top:35px; right:15px; font-size:0.65rem; font-weight:bold; color:var(--cbt-red);">Avg: ${avgVal}</div>
-                <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
-                    <line x1="${padding}" y1="${height-padding}" x2="${width-padding}" y2="${height-padding}" stroke="#eee" stroke-width="2" />
-                    <line x1="${padding}" y1="${avgY}" x2="${width-padding}" y2="${avgY}" stroke="var(--cbt-red)" stroke-width="1.5" stroke-dasharray="4" opacity="0.6" />
+                <h4 style="margin:0 0 10px 0; color:#333; text-align:center; font-size: 0.95rem;">${title}</h4>
+                <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" style="overflow:visible;">
+                    <text x="${padXLeft-5}" y="${padY+4}" font-size="9" fill="#888" text-anchor="end">${maxVal.toFixed(0)}</text>
+                    <text x="${padXLeft-5}" y="${height-padY+4}" font-size="9" fill="#888" text-anchor="end">${minVal.toFixed(0)}</text>
+                    <line x1="${padXLeft}" y1="${padY}" x2="${padXLeft}" y2="${height-padY}" stroke="#eee" stroke-width="1" />
+                    
+                    <line x1="${padXLeft}" y1="${height-padY}" x2="${width-padXRight}" y2="${height-padY}" stroke="#eee" stroke-width="2" />
+                    
+                    <line x1="${padXLeft}" y1="${avgY}" x2="${width-padXRight}" y2="${avgY}" stroke="var(--cbt-red)" stroke-width="1.5" stroke-dasharray="4" opacity="0.6" />
+                    <text x="${width-padXRight}" y="${avgLabelY}" font-size="9" font-weight="bold" fill="var(--cbt-red)" text-anchor="end">Avg: ${avgVal}</text>
+                    
+                    <line x1="${padXLeft}" y1="${medY}" x2="${width-padXRight}" y2="${medY}" stroke="var(--cbt-purple)" stroke-width="1" opacity="0.5" />
+                    <text x="${padXLeft+2}" y="${medLabelY}" font-size="9" font-weight="bold" fill="var(--cbt-purple)">Med: ${medVal}</text>
+
+                    <polyline fill="none" stroke="#222" stroke-width="1" points="${rollPoints}" opacity="0.5" />
+                    
                     <polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${points}" />
                     ${circles}
                 </svg>
@@ -3164,9 +3257,9 @@
         }
 
         function generateAdvancedCharts(data) {
-            let chartData = [...data].slice(0, 15).reverse(); 
+            let chartData = [...data].reverse(); // Send full reversed data to SVG engine so timelines work!
             let html = '<div style="margin-bottom: 20px;">';
-
+            
             html += `<div style="display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px;">`;
 
             // Dynamically build the Keys based on the active Deep-Dive Subject
