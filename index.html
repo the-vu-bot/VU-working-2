@@ -3028,7 +3028,7 @@
             return `
             <div style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
                 <strong style="width: 100%; text-align: center; color: var(--cbt-blue); font-size: 0.95rem; margin-bottom: 10px;">Vault Filters</strong>
-                <div class="scrollable-filter-bar" style="justify-content: center;">
+                <div class="scrollable-filter-bar" style="padding: 0 5px;">
                     <select id="j-filter-type" class="filter-chip" style="margin:0; width:auto; flex-shrink: 0;" onchange="updateJourneyFilters()">
                         <option value="all" ${journeyFilterType==='all'?'selected':''}>All Modes</option>
                         <option value="mock" ${journeyFilterType==='mock'?'selected':''}>Full Mocks</option>
@@ -3072,7 +3072,7 @@
             let html = `
             <div style="background: white; padding: 12px 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
                 <strong style="width: 100%; text-align: center; color: var(--cbt-purple); font-size: 0.95rem; margin-bottom: 10px;">Subject Deep-Dive</strong>
-                <div class="scrollable-filter-bar" style="justify-content: center;">`;
+                <div class="scrollable-filter-bar" style="padding: 0 5px;">`;
             
             sortedSubjects.forEach(sub => {
                 html += `<button class="filter-chip ${activeMockSubject===sub?'active':''}" style="flex-shrink: 0;" onclick="switchMockSubject('${sub}')">${sub}</button>`;
@@ -3106,14 +3106,14 @@
             <div style="margin-bottom: 15px; background:#f4f8fb; padding:12px; border-radius:12px; display: flex; flex-direction: column; gap: 5px;">
                 <strong style="width: 100%; text-align: center; color: #d9a05b; font-size: 0.95rem; margin-bottom: 5px;">Timeline & Metrics</strong>
                 
-                <div class="scrollable-filter-bar" style="justify-content: center; padding-bottom: 5px; border-bottom: 1px dashed #ddd;">
-                    <button class="filter-chip ${currentChartMode === 'all' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('all', this)">📊 All Metrics</button>
-                    <button class="filter-chip ${currentChartMode === 'score' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('score', this)">🏆 Score</button>
-                    <button class="filter-chip ${currentChartMode === 'acc' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('acc', this)">🎯 Acc (%)</button>
-                    <button class="filter-chip ${currentChartMode === 'time' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('time', this)">⏱️ Time</button>
+                <div class="scrollable-filter-bar" style="padding-bottom: 5px; border-bottom: 1px dashed #ddd;">
+                    <button class="filter-chip journey-chart-btn ${currentChartMode === 'all' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('all', this)">📊 All Metrics</button>
+                    <button class="filter-chip journey-chart-btn ${currentChartMode === 'score' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('score', this)">🏆 Score</button>
+                    <button class="filter-chip journey-chart-btn ${currentChartMode === 'acc' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('acc', this)">🎯 Acc (%)</button>
+                    <button class="filter-chip journey-chart-btn ${currentChartMode === 'time' ? 'active' : ''}" style="flex-shrink:0;" onclick="switchJourneyChart('time', this)">⏱️ Time</button>
                 </div>
 
-                <div class="scrollable-filter-bar" style="justify-content: center; padding-top: 5px;">
+                <div class="scrollable-filter-bar" style="padding-top: 5px;">
                     <span style="font-size:0.8rem; font-weight:bold; color:#888; margin-right:5px; flex-shrink:0;">History:</span>
                     <button class="filter-chip ${journeyChartLimit===7?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(7)">7 Days</button>
                     <button class="filter-chip ${journeyChartLimit===15?'active':''}" style="flex-shrink:0;" onclick="setJourneyLimit(15)">15 Days</button>
@@ -3306,17 +3306,18 @@
 
         function switchJourneyChart(mode, btnEl) {
             currentChartMode = mode;
-            // 1. Reset all buttons to inactive state
+            
+            // 1. Reset all buttons to inactive state cleanly
             document.querySelectorAll('.journey-chart-btn').forEach(btn => {
-                btn.style.background = 'white';
-                btn.style.color = '#555';
-                btn.style.borderColor = '#ccc';
+                btn.classList.remove('active');
+                // Failsafe: Clear any old inline styles that might be stuck
+                btn.style.background = '';
+                btn.style.color = '';
+                btn.style.borderColor = '';
             });
             
-            // 2. Highlight the clicked button
-            btnEl.style.background = 'var(--cbt-purple)';
-            btnEl.style.color = 'white';
-            btnEl.style.borderColor = 'var(--cbt-purple)';
+            // 2. Highlight the newly clicked button
+            btnEl.classList.add('active');
 
             // 3. Find the chart containers
             let cScore = document.getElementById('j-chart-score');
